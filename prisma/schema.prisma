@@ -1,0 +1,20 @@
+// Solo la conexión y el generador. Los modelos van en ./schema/, agrupados por
+// dominio de negocio (core.prisma, ...) y no por módulo:
+// varias entidades relacionadas comparten un mismo archivo aunque vivan en
+// distintos módulos de src/modules/.
+//
+// Este archivo tiene que quedarse en la raíz de prisma/, al lado de schema/,
+// migrations/ y seeds/: Prisma 7 no lo busca dentro de subdirectorios.
+//
+// `prisma/` es territorio de la HERRAMIENTA: schema, migraciones y seeds. Lo
+// que consume la aplicación —módulo, service y filtro de excepciones— vive
+// aparte, en src/core/database/prisma/.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

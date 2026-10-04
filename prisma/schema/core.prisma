@@ -1,0 +1,74 @@
+/// Quien entra al sistema: el personal del taller. Los clientes del taller no
+/// inician sesión, así que no son usuarios.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  /// Se guarda siempre en minúsculas: es con lo que se inicia sesión, y
+  /// «Juan@Taller.pe» y «juan@taller.pe» son la misma persona.
+  email        String    @unique
+  name         String
+  /// Un usuario tiene un solo rol. El taller solo necesita dos, así que lo que
+  /// puede hacer cada uno se decide por rol, sin tabla de permisos.
+  role         UserRole  @default(MECHANIC)
+  /// Hash argon2id de la contraseña, con su sal y parámetros incluidos. La
+  /// contraseña nunca se guarda. Opcional: un usuario sin contraseña existe
+  /// pero no puede iniciar sesión hasta que se le asigne una.
+  passwordHash String?   @map("password_hash")
+  /// Un usuario no se borra, se da de baja: lo que registró tiene que seguir
+  /// teniendo autor. Uno inactivo no puede iniciar sesión ni refrescar la suya.
+  isActive     Boolean   @default(true) @map("is_active")
+  /// El último inicio de sesión correcto. Sirve para detectar cuentas
+  /// abandonadas y para auditoría.
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sessions Session[]
+
+  @@map("core_user")
+}
+
+/// Lo que puede hacer un usuario. Es un enum y no una tabla porque los roles
+/// los define el código: cada uno protege endpoints con @Roles().
+enum UserRole {
+  /// Español: administrador. Gestiona el taller y a los usuarios.
+  ADMIN
+  /// Español: mecánico.
+  MECHANIC
+}
+
+/// Una sesión iniciada: el token de refresco con el que un usuario renueva su
+/// acceso sin volver a escribir la contraseña. Existe para poder revocar el
+/// acceso (cerrar sesión, dar de baja, detectar un token robado), cosa que un
+/// JWT por sí solo no permite.
+///
+/// Cada refresco revoca la fila usada y crea otra en la misma familia. Si llega
+/// un token ya revocado, alguien lo copió: se revoca la familia entera.
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  /// SHA-256 del token de refresco, en hexadecimal. El token nunca se guarda:
+  /// si la base se filtra, estos hashes no sirven para entrar.
+  tokenHash    String    @unique @map("token_hash") @db.Char(64)
+  /// Agrupa las sesiones que salen de un mismo inicio de sesión, una por cada
+  /// refresco. Es lo que se revoca entero cuando se detecta un token reusado.
+  familyId     String    @map("family_id") @db.Uuid
+  expiresAt    DateTime  @map("expires_at")
+  /// Vacío mientras la sesión sirve. Se llena al refrescar, al cerrar sesión o
+  /// al revocar la familia.
+  revokedAt    DateTime? @map("revoked_at")
+  /// La sesión que la reemplazó al refrescar. Vacío si se revocó por cierre de
+  /// sesión o por reuso: distingue una rotación normal de un cierre.
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  /// Desde dónde se inició, para que el usuario reconozca sus sesiones.
+  ip           String?   @db.VarChar(45)
+  userAgent    String?   @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Cascade: las sesiones de un usuario no tienen sentido sin él.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("core_session")
+}
