@@ -114,7 +114,7 @@ export class AuthController {
   @ApiOkResponse({ type: CurrentSession })
   @ApiUnauthorizedResponse({ description: 'Sin sesión o sesión expirada' })
   async session(@CurrentUser() user: SessionUser): Promise<CurrentSession> {
-    return new CurrentSession(await this.auth.getSession(user.id));
+    return new CurrentSession(await this.auth.getSession(user.userId));
   }
 
   private setCookies(response: Response, result: SessionResult) {

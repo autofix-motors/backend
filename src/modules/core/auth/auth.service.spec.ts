@@ -13,7 +13,7 @@ const PASSWORD = 'contrasena-correcta';
 
 async function user(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'u1',
+    userId: 'u1',
     email: 'ana@taller.local',
     name: 'Ana',
     isActive: true,
@@ -103,7 +103,7 @@ describe('AuthService', () => {
     });
     expect(result.refreshToken).toBe('refresh-token');
     expect(prisma.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'u1' } }),
+      expect.objectContaining({ where: { userId: 'u1' } }),
     );
   });
 });

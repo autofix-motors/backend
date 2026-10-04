@@ -61,21 +61,21 @@ export class AuthService implements OnModuleInit {
     }
 
     await this.prisma.user.update({
-      where: { id: user.id },
+      where: { userId: user.userId },
       data: { lastLoginAt: new Date() },
     });
 
     return {
       user,
       accessToken: await this.signAccessToken(user),
-      refreshToken: await this.sessions.create(user.id, origin),
+      refreshToken: await this.sessions.create(user.userId, origin),
     };
   }
 
   async refresh(token: string, origin: SessionOrigin): Promise<SessionResult> {
     const rotated = await this.sessions.rotate(token, origin);
     const user = await this.prisma.user.findUnique({
-      where: { id: rotated.userId },
+      where: { userId: rotated.userId },
     });
 
     // Aquí es donde un usuario dado de baja pierde el acceso: su JWT vigente
@@ -99,7 +99,7 @@ export class AuthService implements OnModuleInit {
   /** El usuario de la sesión, leído de la base para que salga actualizado. */
   async getSession(userId: string): Promise<User> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { userId },
     });
     if (!user?.isActive) {
       throw new UnauthorizedException('Tu usuario está dado de baja');
@@ -109,7 +109,7 @@ export class AuthService implements OnModuleInit {
 
   private signAccessToken(user: User): Promise<string> {
     const payload: AccessPayload = {
-      sub: user.id,
+      sub: user.userId,
       role: user.role,
     };
     const minutes = this.config.getOrThrow<number>('ACCESS_TOKEN_MINUTES');

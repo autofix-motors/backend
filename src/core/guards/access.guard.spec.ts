@@ -47,6 +47,6 @@ describe('AccessGuard', () => {
     const request: Record<string, unknown> = { cookies: { afm_access: token } };
 
     await expect(guard.canActivate(testContext(request))).resolves.toBe(true);
-    expect(request.user).toEqual({ id: 'u1', role: 'MECHANIC' });
+    expect(request.user).toEqual({ userId: 'u1', role: 'MECHANIC' });
   });
 });

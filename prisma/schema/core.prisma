@@ -1,7 +1,7 @@
 /// Quien entra al sistema: el personal del taller. Los clientes del taller no
 /// inician sesión, así que no son usuarios.
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @id @default(uuid()) @map("user_id") @db.Uuid
   /// Se guarda siempre en minúsculas: es con lo que se inicia sesión, y
   /// «Juan@Taller.pe» y «juan@taller.pe» son la misma persona.
   email        String    @unique
@@ -44,7 +44,7 @@ enum UserRole {
 /// Cada refresco revoca la fila usada y crea otra en la misma familia. Si llega
 /// un token ya revocado, alguien lo copió: se revoca la familia entera.
 model Session {
-  id           String    @id @default(uuid()) @db.Uuid
+  sessionId    String    @id @default(uuid()) @map("session_id") @db.Uuid
   userId       String    @map("user_id") @db.Uuid
   /// SHA-256 del token de refresco, en hexadecimal. El token nunca se guarda:
   /// si la base se filtra, estos hashes no sirven para entrar.
@@ -66,7 +66,7 @@ model Session {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Cascade: las sesiones de un usuario no tienen sentido sin él.
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@index([userId])
   @@index([familyId])

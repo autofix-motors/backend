@@ -13,7 +13,7 @@ export interface AccessPayload {
 
 /** El usuario autenticado de la petición, tal como lo deja el AccessGuard. */
 export interface SessionUser {
-  id: string;
+  userId: string;
   role: UserRole;
 }
 

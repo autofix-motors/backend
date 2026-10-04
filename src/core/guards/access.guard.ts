@@ -52,7 +52,7 @@ export class AccessGuard implements CanActivate {
       throw new UnauthorizedException('Tu sesión expiró');
     }
 
-    request.user = { id: payload.sub, role: payload.role };
+    request.user = { userId: payload.sub, role: payload.role };
     return true;
   }
 }

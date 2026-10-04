@@ -6,7 +6,8 @@ import { testContext } from './test-context.js';
 describe('RolesGuard', () => {
   const reflector = new Reflector();
   const guard = new RolesGuard(reflector);
-  const withRole = (role: string) => testContext({ user: { id: 'u1', role } });
+  const withRole = (role: string) =>
+    testContext({ user: { userId: 'u1', role } });
 
   afterEach(() => vi.restoreAllMocks());
 

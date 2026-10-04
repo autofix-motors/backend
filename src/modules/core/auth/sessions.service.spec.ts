@@ -13,7 +13,7 @@ const EXPIRED = new UnauthorizedException(
 
 function session(overrides: Record<string, unknown> = {}) {
   return {
-    id: 's1',
+    sessionId: 's1',
     userId: 'u1',
     familyId: 'f1',
     tokenHash: hashToken('token'),
@@ -27,7 +27,7 @@ describe('SessionsService.rotate', () => {
   const tx = {
     session: {
       updateMany: vi.fn(),
-      create: vi.fn().mockResolvedValue({ id: 's2' }),
+      create: vi.fn().mockResolvedValue({ sessionId: 's2' }),
       update: vi.fn(),
     },
   };
@@ -83,7 +83,7 @@ describe('SessionsService.rotate', () => {
       }),
     });
     expect(tx.session.update).toHaveBeenCalledWith({
-      where: { id: 's1' },
+      where: { sessionId: 's1' },
       data: { replacedById: 's2' },
     });
   });

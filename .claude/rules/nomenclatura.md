@@ -186,6 +186,28 @@ enum UserRole {
 Los campos comunes de cada modelo son `createdAt` y `updatedAt`
 (`created_at`, `updated_at` en la base).
 
+## La clave primaria se llama `<entidad>Id`, nunca `id`
+
+```prisma
+model WorkOrder {
+  workOrderId String @id @default(uuid()) @map("work_order_id") @db.Uuid
+  vehicleId   String @map("vehicle_id") @db.Uuid   // FK: el mismo nombre que la PK de Vehicle
+}
+```
+
+- **El id de cada modelo es `<entidad>Id`** en camelCase (`userId`, `sessionId`,
+  `quoteItemId`), con su columna en snake_case (`user_id`). Nunca `id` a secas.
+- **La clave foránea se llama igual que la primaria a la que apunta**:
+  `vehicle.customerId` ↔ `customer.customerId`. Si un modelo apunta dos veces al
+  mismo, el nombre dice el papel (`mechanicId`, `createdById`, ambos a `User`).
+- **Lo mismo fuera de Prisma**: las entidades de respuesta, los DTO, el usuario de
+  la sesión (`SessionUser.userId`) y los tipos del frontend usan ese nombre.
+
+> Con `id` a secas, en un `join` o en un objeto con varias entidades no se sabe de
+> cuál es cada `id`, y el mismo dato se llama `id` en una tabla y `customerId` en
+> otra. Con `<entidad>Id` el nombre es el mismo en todos lados y se busca de una
+> sola pasada.
+
 ## Tablas: prefijo del archivo de schema, en singular
 
 Cada tabla se llama **`{archivo}_{entidad}`**, en singular y snake_case. El
