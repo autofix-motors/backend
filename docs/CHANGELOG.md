@@ -51,6 +51,15 @@ Reglas:
 
 ## 2026-10-04
 
+### Clientes y respuesta base en toda la API — Eduardo Huarcaya · 18:30
+
+Módulo de clientes (listado paginado con búsqueda por nombre y documento,
+filtros por tipo de documento y estado, alta, edición y borrado real). Toda la
+API responde con `BaseResponseDto`, también los errores y `/auth`.
+
+> **IMPORTANTE** — Cambia el formato de todas las respuestas: el frontend
+> necesita su PR `feature/clientes`. `POST /auth/logout` pasa de 204 a 200.
+
 ### Modelo de datos del taller — Eduardo Huarcaya · 13:10
 
 Todas las entidades del MVP en Prisma: clientes y vehículos, catálogo, órdenes de
