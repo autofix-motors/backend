@@ -8,7 +8,7 @@ model ServiceCatalogItem {
   description          String?
   /// Español: precio de mano de obra referencial, en soles.
   laborPrice           Decimal @map("labor_price") @db.Decimal(10, 2)
-  /// No se borra si ya se usó en una orden: se desactiva y deja de ofrecerse.
+  /// Inactivo: deja de ofrecerse. Usado en una orden, la base no deja borrarlo.
   isActive             Boolean @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")

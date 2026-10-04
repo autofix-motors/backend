@@ -21,7 +21,7 @@ model Product {
   cost      Decimal       @db.Decimal(10, 2)
   /// Español: precio de venta al cliente, en soles.
   price     Decimal       @db.Decimal(10, 2)
-  /// No se borra si tiene movimientos: se desactiva y deja de ofrecerse.
+  /// Inactivo: deja de ofrecerse. Con movimientos la base no deja borrarlo.
   isActive  Boolean       @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")

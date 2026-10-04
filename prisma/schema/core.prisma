@@ -15,8 +15,8 @@ model User {
   /// contraseña nunca se guarda. Opcional: un usuario sin contraseña existe
   /// pero no puede iniciar sesión hasta que se le asigne una.
   passwordHash String?   @map("password_hash")
-  /// Un usuario no se borra, se da de baja: lo que registró tiene que seguir
-  /// teniendo autor. Uno inactivo no puede iniciar sesión ni refrescar la suya.
+  /// Uno inactivo no puede iniciar sesión ni refrescar la suya. Borrarlo de
+  /// verdad solo se puede si no registró nada: lo que hizo necesita su autor.
   isActive     Boolean   @default(true) @map("is_active")
   /// El último inicio de sesión correcto. Sirve para detectar cuentas
   /// abandonadas y para auditoría.
@@ -27,8 +27,8 @@ model User {
 
   sessions Session[]
 
-  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Por eso un
-  // usuario se da de baja y no se borra: estas filas necesitan su autor.
+  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Con estas
+  // filas, la base no deja borrarlo (RESTRICT): se desactiva.
   assignedWorkOrders WorkOrder[]      @relation("WorkOrderMechanic")
   createdWorkOrders  WorkOrder[]      @relation("WorkOrderCreatedBy")
   workOrderEvents    WorkOrderEvent[]

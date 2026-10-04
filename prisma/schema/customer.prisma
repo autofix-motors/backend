@@ -16,8 +16,9 @@ model Customer {
   email          String?      @db.VarChar(254)
   address        String?      @db.VarChar(250)
   notes          String?
-  /// Un cliente no se borra, se desactiva: sus órdenes y pagos siguen
-  /// necesitando a quién pertenecen.
+  /// Estado de operación: un cliente inactivo no se ofrece al crear órdenes.
+  /// Borrarlo es borrarlo de verdad, y la base lo impide si tiene vehículos u
+  /// órdenes (RESTRICT): su historial necesita a quién pertenece.
   isActive       Boolean      @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
