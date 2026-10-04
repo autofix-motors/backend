@@ -109,6 +109,25 @@ No hace falta entender cada línea. Sí hace falta preguntar estas seis cosas:
    commits enlazados, y marcado como IMPORTANTE si toca una variable de entorno,
    cambia un flujo o exige configurar algo fuera del repositorio.
 
+## Puertos: los de quien desarrolla no se tocan
+
+Quien dirige el proyecto tiene siempre corriendo su frontend en el **3000** y su
+backend en el **3001** (los de su `.env`). Cuando la IA levanta servidores para
+probar, usa **otros puertos**: **3100** para el frontend y **3101** para el
+backend, y los detiene al terminar.
+
+```bash
+# backend de prueba
+PORT=3101 pnpm start:dev
+# frontend de prueba, contra ese backend
+API_URL=http://localhost:3101 pnpm exec vite dev --port 3100
+# tipos de la API desde el backend de prueba
+pnpm exec openapi-typescript http://localhost:3101/api/docs-json -o src/types/api.gen.ts
+```
+
+Nunca se arranca ni se detiene un proceso en el 3000 o el 3001: son de la persona,
+y chocar con ellos le corta lo que está probando.
+
 ## Cuándo desconfiar
 
 - **Dice que algo funciona sin haberlo corrido.** Pídele que lo ejecute. Si no
