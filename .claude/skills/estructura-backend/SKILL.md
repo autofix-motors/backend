@@ -457,10 +457,32 @@ usuario campo por campo para que el hash de la contraseña nunca salga.
 - **Los `Decimal` salen como cadena, con `.toFixed(2)`.** Prisma los devuelve
   como objetos de decimal.js para no perder céntimos; serializados sin más,
   `180.50` viaja como `"180.5"` y el céntimo se pierde al cuadrar totales.
-- La respuesta se declara con `@ApiOkResponse({ type: ... })`. El tipo de
-  retorno de TypeScript no alcanza: sin el plugin de CLI de `@nestjs/swagger`
-  —que este proyecto no usa—, el decorador es la única fuente de la
-  documentación.
+- La respuesta se declara con `@ApiBaseResponse(Modelo)` o
+  `@ApiPaginatedResponse(Modelo)` (`src/shared/swagger/`), no con
+  `@ApiOkResponse`. El tipo de retorno de TypeScript no alcanza: sin el plugin
+  de CLI de `@nestjs/swagger` —que este proyecto no usa—, el decorador es la
+  única fuente de la documentación, y Swagger no entiende el genérico
+  `BaseResponseDto<T>` sin ayuda.
+
+### Toda respuesta va en `BaseResponseDto`
+
+El controlador nunca devuelve la entidad suelta: la envuelve con
+`BaseResponseDto.success(data, mensaje, status?, meta?)`
+(`src/shared/dto/base-response.dto.ts`). El `mensaje` es en español y es lo que
+el frontend le muestra al usuario («Cliente registrado»). Los errores no se
+envuelven a mano: se lanza la excepción de Nest con su mensaje y el filtro
+global (`src/core/filters/api-exception.filter.ts`) arma la respuesta, igual que
+con los errores de Prisma.
+
+- **Borrar** responde 200 con `data: null` y un mensaje, no 204: el formato es
+  el mismo para todo.
+- **Un listado** recibe un DTO que extiende `PaginationQueryDto`
+  (`page`, `pageSize`, `search`) con sus filtros, y el service devuelve un
+  `Page<T>` (`src/shared/pagination.ts`): `findMany` y `count` con el mismo
+  `where` en una `$transaction`, `pageWindow()` para `skip`/`take`, y un
+  desempate por la clave primaria en `orderBy` para que las páginas no se
+  pisen. La paginación sale en `meta`.
+- **El ejemplo real** es `modules/customer/customers/`.
 
 ### El service consulta directo
 

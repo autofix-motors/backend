@@ -8,6 +8,7 @@ import { ApiExceptionFilter } from './core/filters/api-exception.filter.js';
 import { AccessGuard } from './core/guards/access.guard.js';
 import { RolesGuard } from './core/guards/roles.guard.js';
 import { CoreModule } from './modules/core/core.module.js';
+import { CustomerModule } from './modules/customer/customer.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CoreModule } from './modules/core/core.module.js';
     // Un módulo por grupo de dominio (src/modules/<group>/); cada grupo importa
     // sus propios módulos.
     CoreModule,
+    CustomerModule,
   ],
   controllers: [AppController],
   providers: [
