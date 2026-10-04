@@ -15,10 +15,10 @@ encontrar buscando:
   tutoriales son de Prisma 6 y no aplican.
 - **La versión de Prisma está fijada exacta, y no es un capricho.** Ver abajo.
 
-> **Qué hay hoy.** El backend es la base del proyecto: solo existe el grupo
-> `core` (usuarios, sesiones y el login). Los ejemplos de un taller —un grupo
-> `workshop` con `vehicles`, `customers` y `work-orders`, un `workshop.prisma`—
-> muestran **cómo se vería** un dominio nuevo; no son código que exista.
+> **Qué hay hoy.** El modelo de datos completo ya está en `prisma/schema/`
+> (`core`, `customer`, `workshop`, `inventory`, `finance`), pero en `src/` solo
+> existe el grupo `core` (el login). Los ejemplos de módulos —`workshop/work-orders`,
+> sus DTO y services— muestran **cómo se vería** el código; todavía no existe.
 
 ## Las versiones de Prisma están fijadas a mano
 
@@ -73,7 +73,11 @@ prisma.config.ts              la configuración de la CLI. Obligatoria en Prisma
 prisma/                       TERRITORIO DE LA HERRAMIENTA
 ├── schema.prisma             datasource + generator, y nada más
 ├── schema/
-│   └── core.prisma           usuarios (con su rol) y sesiones
+│   ├── core.prisma           usuarios (con su rol) y sesiones
+│   ├── customer.prisma       clientes y vehículos
+│   ├── workshop.prisma       catálogo de servicios, órdenes, eventos, ítems y presupuestos
+│   ├── inventory.prisma      repuestos e insumos, kardex y herramientas
+│   └── finance.prisma        pagos
 ├── migrations/               las genera la CLI. Se commitean
 └── seeds/
     ├── index.ts              orquesta el orden
@@ -96,7 +100,7 @@ src/
 │   └── logger/
 ├── generated/prisma/         el cliente generado. NO se commitea, NO se edita
 ├── modules/
-│   └── <group>/              un grupo por archivo de schema (hoy solo core)
+│   └── <group>/              un grupo por archivo de schema (hoy solo core tiene código)
 │       ├── <group>.module.ts importa los módulos del grupo
 │       └── <module>/         un paquete por dominio (lo que genera `nest g res`)
 └── shared/                   lo reutilizable entre módulos
@@ -119,8 +123,9 @@ módulo `users` y el de `auth` cada uno tenga su carpeta en `src/modules/core/`.
 
 Antes de agregar una entidad nueva, la pregunta es **a qué dominio pertenece**,
 no a qué módulo: se agrega al archivo de ese dominio, no se crea uno propio. Si
-el dominio es nuevo, nace su archivo. Por ejemplo, vehículos, clientes y
-órdenes de trabajo irían juntos en un `workshop.prisma`, no en tres archivos.
+el dominio es nuevo, nace su archivo. Por ejemplo, vehículos y clientes van
+juntos en `customer.prisma`, y la orden de trabajo con sus ítems y presupuestos
+en `workshop.prisma`, no un archivo por modelo.
 
 > El agrupamiento es solo para quien lee el schema: Prisma no le da ningún
 > significado a la carpeta ni al nombre del archivo. Fusiona todo lo que
@@ -138,7 +143,7 @@ El archivo se nombra **en singular** (`core.prisma`, `workshop.prisma`) y ese
 nombre es el **prefijo de cada tabla** que define, también en singular:
 
 ```prisma
-// workshop.prisma (ejemplo)
+// workshop.prisma
 model WorkOrder {
   ...
   @@map("workshop_work_order")
@@ -166,13 +171,13 @@ explicación obliga a adivinar para qué sirve, o a preguntarle a quien lo
 escribió, que para entonces quizá ya no está.
 
 ```prisma
-// Ejemplo de cómo se vería un modelo del taller.
+// Ejemplo inspirado en workshop.prisma (discountRate no existe).
 
 /// Un trabajo que el taller hace sobre un vehículo, desde que entra hasta que
 /// se entrega. Es una entidad aparte del vehículo porque el mismo auto vuelve
 /// muchas veces, y cada visita tiene su propio diagnóstico y su propio cobro.
 model WorkOrder {
-  id           String   @id @default(uuid()) @db.Uuid
+  workOrderId  String   @id @default(uuid()) @map("work_order_id") @db.Uuid
   /// El kilometraje al recibir el vehículo, en km. Se congela aquí: el del
   /// vehículo cambia con cada visita.
   mileageIn    Int      @map("mileage_in")
@@ -215,24 +220,28 @@ taller no son usuarios, y `Session` por qué existe si ya hay un JWT.
 Es la petición [#13105](https://github.com/prisma/prisma/issues/13105), abierta
 desde 2022 y sin compromiso de los mantenedores.
 
+La clave primaria se llama **`<entidad>Id`, nunca `id`** (`vehicleId`, con su
+columna `vehicle_id`), y la clave foránea que la apunta, igual: ver
+[`nomenclatura.md`](../../rules/nomenclatura.md).
+
 Así que **cada modelo declara sus campos comunes**, y eso es lo correcto aquí,
 no un apaño:
 
 ```prisma
 // Ejemplo
 model Vehicle {
-  id    String @id @default(uuid()) @db.Uuid
-  plate String @unique @db.VarChar(10)
+  vehicleId String @id @default(uuid()) @map("vehicle_id") @db.Uuid
+  plate     String @unique @db.VarChar(10)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")
 
-  @@map("workshop_vehicle")
+  @@map("customer_vehicle")
 }
 
 model WorkOrderNote {
-  id   String @id @default(uuid()) @db.Uuid
-  text String
+  workOrderNoteId String @id @default(uuid()) @map("work_order_note_id") @db.Uuid
+  text            String
 
   createdAt DateTime @default(now()) @map("created_at")
   // Sin `updatedAt`: las notas no se editan. Omitir un campo común es
@@ -625,6 +634,11 @@ pnpm db:seed
 pnpm db:studio
 ```
 
+- **Una migración escrita a mano lleva la hora en UTC** en el nombre de su
+  carpeta (`date -u +%Y%m%d%H%M%S`), como las que genera Prisma. Prisma las
+  aplica en orden alfabético: con la hora local (UTC−5) una migración nueva
+  queda **antes** que otras más viejas, falla al aplicarse sobre tablas que
+  todavía no existen y bloquea las siguientes. Pasó con `renombrar_ids`.
 - **Todo cambio del schema necesita su migración generada, revisada y
   commiteada.** Editar un `.prisma` sin migrar funciona en tu máquina —el
   cliente se regenera— y falla al desplegar. No avisa.

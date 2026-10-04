@@ -41,17 +41,17 @@ Cada cambio de estado guarda fecha, usuario y una nota opcional, marcada como
 | Grupo (`prisma/schema/`) | Módulo | Qué hace |
 |---|---|---|
 | `core` | `users` | Personal, de forma simple: alta y baja de usuarios, rol, cambio de contraseña. Carga de trabajo por mecánico (órdenes abiertas) |
-| `customers` | `customers` | Cliente: nombre, DNI o RUC, teléfono, correo. Búsqueda por nombre, documento o teléfono |
-| `customers` | `vehicles` | Vehículo: placa única, marca, modelo, año, color, VIN opcional. Historial de órdenes por vehículo |
-| `services` | `service-catalog` | Catálogo de servicios con precio referencial de mano de obra (cambio de aceite, afinamiento…) |
-| `services` | `work-orders` | La OT: ingreso (kilometraje, motivo, fecha prometida), diagnóstico, ítems (servicios y repuestos), estados, mecánico |
-| `services` | `quotes` | Presupuestos versionados de una OT y la decisión del cliente, registrada por el administrador |
+| `customer` | `customers` | Cliente: nombre, DNI o RUC, teléfono, correo. Búsqueda por nombre, documento o teléfono |
+| `customer` | `vehicles` | Vehículo: placa única, marca, modelo, año, color, VIN opcional. Historial de órdenes por vehículo |
+| `workshop` | `service-catalog` | Catálogo de servicios con precio referencial de mano de obra (cambio de aceite, afinamiento…) |
+| `workshop` | `work-orders` | La OT: ingreso (kilometraje, motivo, fecha prometida), diagnóstico, ítems (servicios y repuestos), estados, mecánico |
+| `workshop` | `quotes` | Presupuestos versionados de una OT y la decisión del cliente, registrada por el administrador |
 | `inventory` | `products` | Repuestos e insumos: código, unidad, stock, stock mínimo, costo, precio de venta. Alerta de stock bajo |
 | `inventory` | `stock-movements` | Kardex simple: entrada (compra), salida (consumo en una OT, automática), ajuste |
 | `inventory` | `tools` | Herramientas: código, estado (operativa, en reparación, de baja), mecánico que la tiene |
 | `finance` | `payments` | Pagos por OT: efectivo, Yape/Plin, tarjeta, transferencia. Adelantos y saldo pendiente |
 | `finance` | `reports` | Ingresos por período, por servicio y por mecánico; mano de obra frente a repuestos; margen de repuestos |
-| `public` | `tracking` | Seguimiento público sin sesión |
+| `workshop` | `tracking` | Seguimiento público sin sesión. Sin tablas propias: lee las de la orden |
 
 **Inicio (dashboard):** órdenes abiertas por estado, listas para entregar,
 vencidas (pasó la fecha prometida), ingresos del mes (solo ADMIN) y productos con
@@ -116,7 +116,7 @@ antes de implementar, y se trabaja en una rama `feature/...` con su PR en
 **backend** y **frontend**.
 
 - [ ] **Fase 1 — Personal, clientes y vehículos.** `core/users`,
-  `customers/customers`, `customers/vehicles`.
+  `customer/customers`, `customer/vehicles`.
 - [ ] **Fase 2 — Servicios.** Catálogo de servicios, órdenes de trabajo con
   estados y línea de tiempo, presupuestos versionados.
 - [ ] **Fase 3 — Seguimiento público.** Página por código con el estado, la

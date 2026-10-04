@@ -13,6 +13,7 @@ traducciones de lo mismo.
 | Administrador | `ADMIN` | Valor de `UserRole` |
 | Mecánico | `MECHANIC` | Valor de `UserRole` |
 | Cliente | `Customer` | Persona o empresa dueña del vehículo. No inicia sesión |
+| Tipo de documento | `DocumentType` | `DNI`, `RUC`, `CE` (carné de extranjería), `PASSPORT` |
 | Vehículo | `Vehicle` | |
 | Placa | `plate` | Única. Se guarda en mayúsculas y sin guiones |
 | Kilometraje | `mileage` | En km. `mileageIn` es el del ingreso |
@@ -22,13 +23,19 @@ traducciones de lo mismo.
 | Nota pública / interna | `isPublic` | La pública la ve el cliente en el seguimiento |
 | Fecha prometida | `promisedDate` | Cuándo se le dijo al cliente que estaría listo |
 | Código de seguimiento | `trackingCode` | Aleatorio, no secuencial (`AFM-7K3Q9X`) |
-| Catálogo de servicios | `ServiceCatalogItem` | Ruta de la API `/service-catalog` |
+| Catálogo de servicios | `ServiceCatalogItem` | Ruta de la API `/service-catalog`. `laborPrice`: precio de mano de obra referencial |
+| Número de orden | `number` | Correlativo interno (OT-000123). No sale en la página pública |
+| Motivo de ingreso | `reason` | Lo que pide el cliente, con sus palabras |
+| Anulación de un pago | `voidedAt`, `voidReason` | Un pago no se borra: se anula |
 | Mano de obra | `labor` | |
 | Presupuesto | `Quote` | Versionado: cada envío es una versión nueva |
-| Ítem (de OT o de presupuesto) | `WorkOrderItem`, `QuoteItem` | Un servicio o un repuesto, con cantidad y precio |
-| Repuesto, insumo | `Product` | Lo que se consume y tiene stock |
-| Herramienta | `Tool` | Se asigna, no se consume |
-| Movimiento de stock, kardex | `StockMovement` | Entrada, salida o ajuste |
+| Estado del presupuesto | `QuoteStatus` | `PENDING` (pendiente), `APPROVED` (aprobado), `REJECTED` (rechazado), `SUPERSEDED` (reemplazado) |
+| Canal de la respuesta | `DecisionChannel` | `PHONE` (llamada), `WHATSAPP`, `IN_PERSON` (en el taller) |
+| Ítem (de OT o de presupuesto) | `WorkOrderItem`, `QuoteItem` | Un servicio o un repuesto, con cantidad y precio. `ItemType`: `SERVICE`, `PRODUCT` |
+| Repuesto, insumo | `Product` | Lo que se consume y tiene stock. `ProductKind`: `PART` (repuesto), `SUPPLY` (insumo) |
+| Unidad de medida | `UnitOfMeasure` | `UNIT`, `LITER`, `GALLON`, `KIT`, `METER` |
+| Herramienta | `Tool` | Se asigna, no se consume. `ToolStatus`: `AVAILABLE` (operativa), `IN_REPAIR`, `RETIRED` (de baja) |
+| Movimiento de stock, kardex | `StockMovement` | `StockMovementType`: `PURCHASE` (compra), `WORK_ORDER` (consumo en OT), `ADJUSTMENT` (ajuste) |
 | Stock mínimo | `minStock` | Debajo de este valor se alerta |
 | Costo / precio de venta | `cost` / `price` | En soles (PEN) |
 | Pago | `Payment` | Uno o varios por OT; un adelanto es un pago |
@@ -51,3 +58,8 @@ traducciones de lo mismo.
 ## Términos que se quedan como están
 
 `DNI`, `RUC`, `SUNAT`, `VIN`, `Yape`, `Plin`.
+
+## Claves primarias
+
+Cada modelo tiene su clave primaria como `<entidad>Id` (`customerId`,
+`workOrderId`), nunca `id`. Ver `.claude/rules/nomenclatura.md`.

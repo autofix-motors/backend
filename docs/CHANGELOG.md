@@ -51,6 +51,17 @@ Reglas:
 
 ## 2026-10-04
 
+### Modelo de datos del taller — Eduardo Huarcaya · 13:10
+
+Todas las entidades del MVP en Prisma: clientes y vehículos, catálogo, órdenes de
+trabajo con su línea de tiempo, ítems y presupuestos, inventario y pagos. Las
+claves primarias pasan a llamarse `<entidad>Id` (`userId`, `sessionId`), también
+en la respuesta de la sesión.
+
+> **IMPORTANTE** — Dos migraciones: `renombrar_ids` (renombra columnas, sin
+> pérdida de datos) y `modelo_del_taller`. `GET /auth/session` y el login
+> devuelven `userId` en vez de `id`: el frontend tiene que regenerar sus tipos.
+
 ### Base del proyecto a partir de la plantilla — Eduardo Huarcaya · 12:10
 
 Arranque de AutoFix Motors con la base técnica de un proyecto anterior, sin su
