@@ -1,0 +1,74 @@
+/// Español: cliente. La persona o empresa que trae un vehículo al taller. No
+/// inicia sesión: sigue sus órdenes desde la página pública con el código de
+/// seguimiento. Es una entidad aparte del vehículo porque un cliente puede tener
+/// varios, y un vehículo puede cambiar de dueño.
+model Customer {
+  customerId     String       @id @default(uuid()) @map("customer_id") @db.Uuid
+  documentType   DocumentType @map("document_type")
+  /// Solo dígitos y letras, sin espacios ni guiones: es lo que se compara para
+  /// no registrar dos veces al mismo cliente.
+  documentNumber String       @map("document_number") @db.VarChar(20)
+  /// Nombre completo de la persona, o razón social si es una empresa (RUC).
+  name           String       @db.VarChar(150)
+  /// Obligatorio: es por donde se le avisa y se le manda el enlace de
+  /// seguimiento por WhatsApp.
+  phone          String       @db.VarChar(20)
+  email          String?      @db.VarChar(254)
+  address        String?      @db.VarChar(250)
+  notes          String?
+  /// Un cliente no se borra, se desactiva: sus órdenes y pagos siguen
+  /// necesitando a quién pertenecen.
+  isActive       Boolean      @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+
+  @@unique([documentType, documentNumber])
+  @@index([name])
+  @@index([phone])
+  @@map("customer_customer")
+}
+
+/// El tipo de documento de identidad. Es un enum porque lo fija la normativa
+/// peruana, no el taller.
+enum DocumentType {
+  DNI
+  RUC
+  /// Español: carné de extranjería.
+  CE
+  /// Español: pasaporte.
+  PASSPORT
+}
+
+/// Español: vehículo. Lo que entra al taller. Es una entidad aparte de la orden
+/// de trabajo porque el mismo vehículo vuelve muchas veces, y su historial es
+/// justamente la lista de sus órdenes.
+model Vehicle {
+  vehicleId  String  @id @default(uuid()) @map("vehicle_id") @db.Uuid
+  /// El dueño actual. Si el vehículo cambia de dueño se actualiza aquí; cada
+  /// orden conserva el cliente que lo trajo (WorkOrder.customerId).
+  customerId String  @map("customer_id") @db.Uuid
+  /// Español: placa. En mayúsculas y sin guion (ABC123): así se escribe al
+  /// buscar y se compara sin ambigüedad.
+  plate      String  @unique @db.VarChar(10)
+  brand      String  @db.VarChar(60)
+  model      String  @db.VarChar(60)
+  year       Int?
+  color      String? @db.VarChar(40)
+  /// Número de serie del fabricante (17 caracteres). Opcional: pocos clientes
+  /// lo traen a mano.
+  vin        String? @unique @db.VarChar(17)
+  notes      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customer   Customer    @relation(fields: [customerId], references: [customerId])
+  workOrders WorkOrder[]
+
+  @@index([customerId])
+  @@map("customer_vehicle")
+}

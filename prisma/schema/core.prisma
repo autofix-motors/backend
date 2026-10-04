@@ -6,6 +6,8 @@ model User {
   /// «Juan@Taller.pe» y «juan@taller.pe» son la misma persona.
   email        String    @unique
   name         String
+  /// Para ubicar al personal; no se usa para iniciar sesión.
+  phone        String?   @db.VarChar(20)
   /// Un usuario tiene un solo rol. El taller solo necesita dos, así que lo que
   /// puede hacer cada uno se decide por rol, sin tabla de permisos.
   role         UserRole  @default(MECHANIC)
@@ -21,8 +23,21 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at")
 
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions Session[]
+
+  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Por eso un
+  // usuario se da de baja y no se borra: estas filas necesitan su autor.
+  assignedWorkOrders WorkOrder[]      @relation("WorkOrderMechanic")
+  createdWorkOrders  WorkOrder[]      @relation("WorkOrderCreatedBy")
+  workOrderEvents    WorkOrderEvent[]
+  sentQuotes         Quote[]          @relation("QuoteSentBy")
+  decidedQuotes      Quote[]          @relation("QuoteDecidedBy")
+  stockMovements     StockMovement[]
+  assignedTools      Tool[]
+  receivedPayments   Payment[]        @relation("PaymentReceivedBy")
+  voidedPayments     Payment[]        @relation("PaymentVoidedBy")
 
   @@map("core_user")
 }

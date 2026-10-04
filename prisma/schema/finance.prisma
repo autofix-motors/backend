@@ -1,0 +1,48 @@
+/// Español: pago. Lo que el cliente abona por una orden: un adelanto, el saldo o
+/// todo junto. Es lo que alimenta los reportes de ingresos. El saldo de la
+/// orden no se guarda: es el total de sus ítems menos sus pagos no anulados.
+///
+/// Un pago no se edita ni se borra: si se registró mal, se anula con su motivo
+/// y se registra otro. Así la caja del día se puede reconstruir siempre.
+model Payment {
+  paymentId    String        @id @default(uuid()) @map("payment_id") @db.Uuid
+  workOrderId  String        @map("work_order_id") @db.Uuid
+  /// En soles. Siempre positivo.
+  amount       Decimal       @db.Decimal(10, 2)
+  method       PaymentMethod
+  /// Español: número de operación de Yape/Plin, tarjeta o transferencia. Vacío
+  /// en efectivo.
+  reference    String?       @db.VarChar(60)
+  /// Cuándo se recibió el dinero, que puede no ser cuando se registró.
+  paidAt       DateTime      @default(now()) @map("paid_at")
+  receivedById String        @map("received_by_id") @db.Uuid
+  note         String?
+  /// Se llenan juntos al anular el pago; uno anulado no cuenta en el saldo ni
+  /// en los ingresos.
+  voidedAt     DateTime?     @map("voided_at")
+  voidedById   String?       @map("voided_by_id") @db.Uuid
+  voidReason   String?       @map("void_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  // Sin updatedAt: un pago no se edita; anularlo usa voidedAt.
+
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
+  receivedBy User      @relation("PaymentReceivedBy", fields: [receivedById], references: [userId])
+  voidedBy   User?     @relation("PaymentVoidedBy", fields: [voidedById], references: [userId], onDelete: Restrict)
+
+  @@index([workOrderId])
+  @@index([paidAt])
+  @@map("finance_payment")
+}
+
+/// Español: método de pago. Los que acepta el taller.
+enum PaymentMethod {
+  /// Español: efectivo.
+  CASH
+  /// Billeteras digitales (Yape o Plin): para el taller son lo mismo.
+  YAPE_PLIN
+  /// Español: tarjeta de débito o crédito.
+  CARD
+  /// Español: transferencia bancaria.
+  TRANSFER
+}

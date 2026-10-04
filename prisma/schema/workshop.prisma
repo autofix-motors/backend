@@ -1,0 +1,258 @@
+/// Español: servicio del catálogo. Los trabajos que el taller ofrece siempre
+/// (cambio de aceite, afinamiento…), para no escribirlos a mano en cada orden.
+/// Su precio es una referencia: al agregarlo a una orden se copia y ahí se puede
+/// ajustar.
+model ServiceCatalogItem {
+  serviceCatalogItemId String  @id @default(uuid()) @map("service_catalog_item_id") @db.Uuid
+  name                 String  @unique @db.VarChar(120)
+  description          String?
+  /// Español: precio de mano de obra referencial, en soles.
+  laborPrice           Decimal @map("labor_price") @db.Decimal(10, 2)
+  /// No se borra si ya se usó en una orden: se desactiva y deja de ofrecerse.
+  isActive             Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workOrderItems WorkOrderItem[]
+
+  @@map("workshop_service_catalog_item")
+}
+
+/// Español: orden de trabajo (OT). Un ingreso del vehículo al taller, desde que
+/// se recibe hasta que se entrega. Es el centro del sistema: de ella cuelgan los
+/// ítems que se cobran, los presupuestos, la línea de tiempo que ve el cliente y
+/// los pagos.
+model WorkOrder {
+  workOrderId  String          @id @default(uuid()) @map("work_order_id") @db.Uuid
+  /// El número que usa el taller al hablar de la orden (OT-000123). Es
+  /// correlativo, así que no se muestra en la página pública: delataría cuántas
+  /// órdenes hay.
+  number       Int             @unique @default(autoincrement())
+  /// Español: código de seguimiento. Aleatorio y no correlativo (AFM-7K3Q9X):
+  /// es la llave de la página pública, así que no se puede adivinar uno a
+  /// partir de otro.
+  trackingCode String          @unique @map("tracking_code") @db.VarChar(12)
+  /// El cliente que trajo el vehículo, congelado al recibirlo: si el vehículo
+  /// cambia de dueño, la orden sigue siendo de quien la pidió y pagó.
+  customerId   String          @map("customer_id") @db.Uuid
+  vehicleId    String          @map("vehicle_id") @db.Uuid
+  /// El mecánico asignado. Vacío mientras el administrador no la asigna; un
+  /// mecánico solo ve las órdenes donde figura aquí.
+  mechanicId   String?         @map("mechanic_id") @db.Uuid
+  createdById  String          @map("created_by_id") @db.Uuid
+  status       WorkOrderStatus @default(RECEIVED)
+  /// Español: kilometraje al ingreso, en km. Se congela aquí porque el vehículo
+  /// vuelve con otro en cada visita.
+  mileageIn    Int             @map("mileage_in")
+  /// Lo que el cliente pide o reporta al dejar el vehículo, con sus palabras.
+  reason       String
+  /// Lo que encontró el mecánico. Vacío hasta terminar el diagnóstico.
+  diagnosis    String?
+  /// Español: fecha prometida. Cuándo se le dijo al cliente que estaría listo;
+  /// pasada esta fecha sin entregar, la orden figura como vencida.
+  promisedDate DateTime?       @map("promised_date") @db.Date
+  receivedAt   DateTime        @default(now()) @map("received_at")
+  /// Se llena al pasar a DELIVERED.
+  deliveredAt  DateTime?       @map("delivered_at")
+  /// Se llenan al pasar a CANCELLED; el motivo es obligatorio en ese caso (lo
+  /// valida el service).
+  cancelledAt  DateTime?       @map("cancelled_at")
+  cancelReason String?         @map("cancel_reason")
+
+  // Sin campos de totales: el total sale de los ítems y el saldo, de restarle
+  // los pagos no anulados. Guardarlos sería tener dos verdades.
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customer  Customer @relation(fields: [customerId], references: [customerId])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [vehicleId])
+  mechanic  User?    @relation("WorkOrderMechanic", fields: [mechanicId], references: [userId], onDelete: Restrict)
+  createdBy User     @relation("WorkOrderCreatedBy", fields: [createdById], references: [userId])
+
+  events   WorkOrderEvent[]
+  items    WorkOrderItem[]
+  quotes   Quote[]
+  payments Payment[]
+
+  @@index([status])
+  @@index([mechanicId])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@map("workshop_work_order")
+}
+
+/// Los estados por los que pasa una orden. Es un enum porque cada estado tiene
+/// reglas en el código (quién puede moverla y a dónde), no solo un nombre.
+enum WorkOrderStatus {
+  /// Español: recibido.
+  RECEIVED
+  /// Español: en diagnóstico.
+  DIAGNOSIS
+  /// Español: esperando aprobación del presupuesto.
+  WAITING_APPROVAL
+  /// Español: en reparación.
+  IN_PROGRESS
+  /// Español: esperando repuestos.
+  WAITING_PARTS
+  /// Español: listo para recoger.
+  READY
+  /// Español: entregado.
+  DELIVERED
+  /// Español: cancelado.
+  CANCELLED
+}
+
+/// Español: evento de la línea de tiempo. Cada cambio de estado o nota de una
+/// orden, con quién y cuándo. Es lo que el cliente lee en el seguimiento (solo
+/// los públicos) y lo que el taller revisa cuando algo salió mal. No se edita
+/// ni se borra: es un historial.
+model WorkOrderEvent {
+  workOrderEventId String           @id @default(uuid()) @map("work_order_event_id") @db.Uuid
+  workOrderId      String           @map("work_order_id") @db.Uuid
+  /// El estado al que pasó la orden. Vacío si el evento es solo una nota.
+  status           WorkOrderStatus?
+  note             String?
+  /// Si lo ve el cliente en la página pública. Una nota interna («el cliente
+  /// discutió el precio») no sale del taller.
+  isPublic         Boolean          @default(false) @map("is_public")
+  createdById      String           @map("created_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  // Sin updatedAt: un evento no se edita.
+
+  // Cascade: los eventos no tienen sentido sin su orden.
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [userId])
+
+  @@index([workOrderId, createdAt])
+  @@map("workshop_work_order_event")
+}
+
+/// Español: ítem de la orden. Lo que se hace y se cobra: un servicio (mano de
+/// obra) o un repuesto. La suma de los ítems es el total de la orden.
+model WorkOrderItem {
+  workOrderItemId      String   @id @default(uuid()) @map("work_order_item_id") @db.Uuid
+  workOrderId          String   @map("work_order_id") @db.Uuid
+  type                 ItemType
+  /// Obligatorio si `type` es SERVICE y vacío si es PRODUCT (lo valida el
+  /// service). Opcional en la base porque un ítem es una cosa o la otra.
+  serviceCatalogItemId String?  @map("service_catalog_item_id") @db.Uuid
+  /// Obligatorio si `type` es PRODUCT y vacío si es SERVICE (lo valida el
+  /// service). Al agregarlo se descuenta el stock (StockMovement).
+  productId            String?  @map("product_id") @db.Uuid
+  /// Copiada del catálogo o del producto al agregar el ítem, y editable: lo
+  /// que se cobra no cambia si después se renombra el original.
+  description          String   @db.VarChar(200)
+  /// En la unidad del producto (litros, unidades…); en un servicio, cuántas
+  /// veces se hace (normalmente 1).
+  quantity             Decimal  @db.Decimal(10, 2)
+  /// En soles, congelado al agregar el ítem: subir el precio del catálogo no
+  /// cambia órdenes ya armadas.
+  unitPrice            Decimal  @map("unit_price") @db.Decimal(10, 2)
+  /// Costo del repuesto al consumirlo, en soles, congelado. Solo en PRODUCT;
+  /// sirve para el margen de los reportes y nunca se muestra al cliente.
+  unitCost             Decimal? @map("unit_cost") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Cascade: un ítem no existe fuera de su orden.
+  workOrder          WorkOrder           @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
+  serviceCatalogItem ServiceCatalogItem? @relation(fields: [serviceCatalogItemId], references: [serviceCatalogItemId], onDelete: Restrict)
+  product            Product?            @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  stockMovement      StockMovement?
+
+  @@index([workOrderId])
+  @@index([productId])
+  @@map("workshop_work_order_item")
+}
+
+/// Qué clase de ítem es. Un enum porque cambia de dónde sale el precio y si
+/// mueve stock.
+enum ItemType {
+  /// Español: servicio, mano de obra.
+  SERVICE
+  /// Español: repuesto o insumo.
+  PRODUCT
+}
+
+/// Español: presupuesto. Lo que el taller le propone al cliente antes de
+/// reparar. Cada envío es una versión nueva y congelada: si aparece otro
+/// problema a mitad de la reparación se envía otra, y la anterior queda en el
+/// historial. El cliente lo ve en el seguimiento; la decisión la registra el
+/// administrador.
+model Quote {
+  quoteId         String           @id @default(uuid()) @map("quote_id") @db.Uuid
+  workOrderId     String           @map("work_order_id") @db.Uuid
+  /// 1, 2, 3… dentro de cada orden.
+  version         Int
+  status          QuoteStatus      @default(PENDING)
+  /// En soles. Redundancia deliberada: congela el total que vio el cliente,
+  /// aunque los ítems de la orden cambien después.
+  total           Decimal          @db.Decimal(10, 2)
+  sentById        String           @map("sent_by_id") @db.Uuid
+  sentAt          DateTime         @default(now()) @map("sent_at")
+  /// El administrador que registró la respuesta del cliente. Vacío mientras
+  /// está PENDING; los cuatro campos de la decisión se llenan juntos.
+  decidedById     String?          @map("decided_by_id") @db.Uuid
+  decidedAt       DateTime?        @map("decided_at")
+  /// Por dónde respondió el cliente.
+  decisionChannel DecisionChannel? @map("decision_channel")
+  decisionNote    String?          @map("decision_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workOrder WorkOrder   @relation(fields: [workOrderId], references: [workOrderId])
+  sentBy    User        @relation("QuoteSentBy", fields: [sentById], references: [userId])
+  decidedBy User?       @relation("QuoteDecidedBy", fields: [decidedById], references: [userId], onDelete: Restrict)
+  items     QuoteItem[]
+
+  @@unique([workOrderId, version])
+  @@map("workshop_quote")
+}
+
+/// En qué quedó un presupuesto.
+enum QuoteStatus {
+  /// Español: pendiente de respuesta.
+  PENDING
+  /// Español: aprobado.
+  APPROVED
+  /// Español: rechazado.
+  REJECTED
+  /// Español: reemplazado. Se envió una versión nueva antes de decidir esta.
+  SUPERSEDED
+}
+
+/// Por dónde llegó la respuesta del cliente a un presupuesto.
+enum DecisionChannel {
+  /// Español: llamada telefónica.
+  PHONE
+  WHATSAPP
+  /// Español: en persona, en el taller.
+  IN_PERSON
+}
+
+/// Español: ítem del presupuesto. Una foto de un ítem de la orden en el momento
+/// de enviar el presupuesto. No apunta al ítem vivo a propósito: si la orden
+/// cambia, el presupuesto tiene que seguir diciendo lo que se propuso.
+model QuoteItem {
+  quoteItemId String   @id @default(uuid()) @map("quote_item_id") @db.Uuid
+  quoteId     String   @map("quote_id") @db.Uuid
+  type        ItemType
+  description String   @db.VarChar(200)
+  quantity    Decimal  @db.Decimal(10, 2)
+  /// En soles.
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  // Sin updatedAt: es una foto, no se edita.
+
+  // Cascade: el ítem no existe fuera de su presupuesto.
+  quote Quote @relation(fields: [quoteId], references: [quoteId], onDelete: Cascade)
+
+  @@index([quoteId])
+  @@map("workshop_quote_item")
+}
