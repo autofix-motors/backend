@@ -21,6 +21,9 @@ export function createValidationPipe(): ValidationPipe {
     transform: true,
     whitelist: true,
     forbidNonWhitelisted: true,
+    // Un mensaje por campo: sin esto, un campo vacío acumula «ingresa X»,
+    // «X es demasiado corto» y «X tiene que ser texto» a la vez.
+    stopAtFirstError: true,
     exceptionFactory: (errors) =>
       new BadRequestException(validationMessages(errors)),
   });
