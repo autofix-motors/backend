@@ -51,6 +51,24 @@ Reglas:
 
 ## 2026-10-04
 
+### Servicios y repuestos de una orden — Eduardo Huarcaya · 22:25
+commits [`746d8e8`](../../commit/746d8e8) · [`2ba1b34`](../../commit/2ba1b34)
+
+Los ítems de la orden (`POST`, `PATCH` y `DELETE` en
+`/work-orders/:workOrderId/items`), para `ADMIN` y el mecánico asignado,
+mientras la orden se diagnostica o se repara. El repuesto descuenta el stock en
+la misma transacción (409 sin stock, sin crear nada) y lo devuelve al quitarse
+con un movimiento `WORK_ORDER` positivo; precio y descripción propios, solo
+`ADMIN`. El detalle trae `items` y `totals` (Decimal; costo y margen solo
+`ADMIN`) y el listado, `total`. Además, una orden lista para recoger ya se
+puede cancelar.
+
+> **IMPORTANTE** — Sin migración (solo cambió un `///` del schema). Cambia el
+> contrato: `WorkOrder` suma `total` y `WorkOrderDetail`, `items` y `totals`;
+> el frontend tiene que regenerar sus tipos. No se probó contra la base:
+> Postgres local no acepta conexiones (scripts de flujo y de datos listos, sin
+> correr).
+
 ### Órdenes de trabajo — Eduardo Huarcaya · 21:50
 commits [`085b208`](../../commit/085b208)
 

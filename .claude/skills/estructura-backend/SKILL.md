@@ -497,6 +497,11 @@ usuario campo por campo para que el hash de la contraseña nunca salga.
 - **Los `Decimal` salen como cadena, con `.toFixed(2)`.** Prisma los devuelve
   como objetos de decimal.js para no perder céntimos; serializados sin más,
   `180.50` viaja como `"180.5"` y el céntimo se pierde al cuadrar totales.
+- **Un monto calculado** (el subtotal y los totales de una orden) se calcula
+  con `Prisma.Decimal`, nunca con `number`, en una función pura con su test
+  (`modules/workshop/work-orders/work-order-totals.ts`): cada línea se
+  redondea a céntimos y los totales suman las líneas ya redondeadas, para que
+  cuadren con lo que se ve. No se guarda: sale de sus ítems.
 - La respuesta se declara con `@ApiBaseResponse(Modelo)` o
   `@ApiPaginatedResponse(Modelo)` (`src/shared/swagger/`), no con
   `@ApiOkResponse`. Una lista corta sin paginar (las opciones de un filtro,
@@ -698,7 +703,10 @@ sí está permitido: es la consulta del módulo dueño de `Vehicle`. Igual
 `ToolsModule` con `UsersModule` (`users.findOne()` para asignar una
 herramienta solo a un usuario activo). Y `WorkOrdersModule` con
 `VehiclesModule`, `CustomersModule` y `UsersModule`: el vehículo que ingresa,
-su dueño (que tiene que estar activo) y el mecánico, cada uno por su service.
+su dueño (que tiene que estar activo) y el mecánico, cada uno por su service;
+y, para sus ítems, con `ServiceCatalogModule`, `ProductsModule` y
+`StockMovementsModule` (el servicio o repuesto que se agrega y el stock que
+mueve).
 
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
 
@@ -742,8 +750,19 @@ async record(tx: Prisma.TransactionClient, movement: NewStockMovement) {
 - **Dentro de la transacción todo va por `tx`**, no por `this.prisma`: una
   consulta con `this.prisma` corre fuera de la transacción y no ve lo que
   todavía no se confirmó.
-- Ejemplo real: `modules/inventory/stock-movements/` y
-  `ProductsService.applyStockChange`.
+- **La reversión también va en una transacción con lo que la causa.** Quitar
+  el repuesto de una orden borra el ítem y registra la devolución
+  (`WORK_ORDER` positivo, sin ítem, con la orden en la nota) en la misma
+  `$transaction`, con el `delete` primero: si otro ya lo quitó, el `delete`
+  falla y el stock no vuelve dos veces. El movimiento original no se toca:
+  queda en el kardex con su ítem en null (`SetNull`).
+- **El orden dentro de la transacción importa**: primero lo que el movimiento
+  referencia (el ítem, por su clave foránea), después `record`, y al final la
+  escritura que comprueba el estado (`where: { …, status }`), que si falla
+  deshace las dos anteriores.
+- Ejemplos reales: `modules/inventory/stock-movements/`,
+  `ProductsService.applyStockChange` y
+  `modules/workshop/work-orders/work-order-items.service.ts`.
 
 ### Estados con reglas y su historial
 
