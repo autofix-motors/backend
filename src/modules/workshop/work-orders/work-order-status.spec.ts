@@ -1,0 +1,95 @@
+import { WorkOrderStatus } from '../../../generated/prisma/enums.js';
+import {
+  canTransition,
+  isClosed,
+  isOverdue,
+  MANUAL_TRANSITIONS,
+} from './work-order-status.js';
+
+// La tabla se prueba entera, par por par y para los dos roles: un cambio en
+// una sola casilla tiene que romper un test, no pasar en silencio.
+
+const STATUSES = Object.values(WorkOrderStatus);
+
+/** Lo permitido, escrito a mano a partir del alcance (no copiado de la tabla). */
+const ADMIN_ALLOWED = new Set([
+  'RECEIVED→DIAGNOSIS',
+  'RECEIVED→IN_PROGRESS',
+  'RECEIVED→CANCELLED',
+  'DIAGNOSIS→IN_PROGRESS',
+  'DIAGNOSIS→CANCELLED',
+  'WAITING_APPROVAL→CANCELLED',
+  'IN_PROGRESS→WAITING_PARTS',
+  'IN_PROGRESS→READY',
+  'IN_PROGRESS→CANCELLED',
+  'WAITING_PARTS→IN_PROGRESS',
+  'WAITING_PARTS→CANCELLED',
+  'READY→DELIVERED',
+  'READY→IN_PROGRESS',
+]);
+
+/** El mecánico: lo mismo, salvo entregar y cancelar. */
+const MECHANIC_ALLOWED = new Set(
+  [...ADMIN_ALLOWED].filter(
+    (pair) => !pair.endsWith('→DELIVERED') && !pair.endsWith('→CANCELLED'),
+  ),
+);
+
+describe('canTransition', () => {
+  const pairs = STATUSES.flatMap((from) => STATUSES.map((to) => [from, to]));
+
+  it.each(pairs)('ADMIN %s → %s', (from, to) => {
+    expect(canTransition(from, to, 'ADMIN')).toBe(
+      ADMIN_ALLOWED.has(`${from}→${to}`),
+    );
+  });
+
+  it.each(pairs)('MECHANIC %s → %s', (from, to) => {
+    expect(canTransition(from, to, 'MECHANIC')).toBe(
+      MECHANIC_ALLOWED.has(`${from}→${to}`),
+    );
+  });
+
+  it('WAITING_APPROVAL no se pide a mano: entra y sale con el presupuesto', () => {
+    for (const from of STATUSES) {
+      expect(canTransition(from, 'WAITING_APPROVAL', 'ADMIN')).toBe(false);
+    }
+    expect(MANUAL_TRANSITIONS.WAITING_APPROVAL).toEqual(['CANCELLED']);
+  });
+
+  it('nadie mueve una orden entregada o cancelada', () => {
+    for (const to of STATUSES) {
+      expect(canTransition('DELIVERED', to, 'ADMIN')).toBe(false);
+      expect(canTransition('CANCELLED', to, 'ADMIN')).toBe(false);
+    }
+  });
+
+  it('un estado no pasa a sí mismo', () => {
+    for (const status of STATUSES) {
+      expect(canTransition(status, status, 'ADMIN')).toBe(false);
+    }
+  });
+});
+
+describe('isClosed', () => {
+  it('solo entregada y cancelada están cerradas', () => {
+    expect(STATUSES.filter(isClosed)).toEqual(['DELIVERED', 'CANCELLED']);
+  });
+});
+
+describe('isOverdue', () => {
+  const today = '2026-10-04';
+
+  it('vence al día siguiente del prometido, no el mismo día', () => {
+    expect(isOverdue('IN_PROGRESS', '2026-10-03', today)).toBe(true);
+    expect(isOverdue('IN_PROGRESS', '2026-10-04', today)).toBe(false);
+    expect(isOverdue('IN_PROGRESS', '2026-10-05', today)).toBe(false);
+  });
+
+  it('sin fecha prometida, o ya cerrada, no vence', () => {
+    expect(isOverdue('RECEIVED', null, today)).toBe(false);
+    expect(isOverdue('DELIVERED', '2026-09-01', today)).toBe(false);
+    expect(isOverdue('CANCELLED', '2026-09-01', today)).toBe(false);
+    expect(isOverdue('READY', '2026-09-01', today)).toBe(true);
+  });
+});

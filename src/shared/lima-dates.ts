@@ -27,3 +27,20 @@ export function limaDayRange(
     ...(to && { lt: new Date(limaDayStart(to).getTime() + DAY_MS) }),
   };
 }
+
+/**
+ * El día de hoy en Lima, `AAAA-MM-DD`. Entre las 19:00 y la medianoche de
+ * Lima, UTC ya va en el día siguiente: tomar `toISOString()` a secas daría por
+ * vencida una orden prometida para hoy.
+ */
+export function limaToday(now: Date = new Date()): string {
+  return LIMA_DAY.format(now);
+}
+
+// «en-CA» escribe la fecha como AAAA-MM-DD.
+const LIMA_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Lima',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});

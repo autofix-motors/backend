@@ -1,4 +1,4 @@
-import { limaDayRange, limaDayStart } from './lima-dates.js';
+import { limaDayRange, limaDayStart, limaToday } from './lima-dates.js';
 
 describe('limaDayStart', () => {
   it('es la medianoche de Lima, cinco horas después de la de UTC', () => {
@@ -28,5 +28,13 @@ describe('limaDayRange', () => {
     expect(limaDayRange(undefined, '2026-12-31')).toEqual({
       lt: new Date('2027-01-01T05:00:00.000Z'),
     });
+  });
+});
+
+describe('limaToday', () => {
+  it('es el día de Lima aunque en UTC ya sea el siguiente', () => {
+    // El 4 a las 23:30 de Lima es el 5 a las 04:30 UTC.
+    expect(limaToday(new Date('2026-10-05T04:30:00.000Z'))).toBe('2026-10-04');
+    expect(limaToday(new Date('2026-10-05T05:00:00.000Z'))).toBe('2026-10-05');
   });
 });
