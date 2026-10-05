@@ -24,6 +24,7 @@ import type { CreateWorkOrderItemDto } from './dto/create-work-order-item.dto.js
 import type { UpdateWorkOrderItemDto } from './dto/update-work-order-item.dto.js';
 import type { WorkOrderWithTimeline } from './entities/work-order-detail.entity.js';
 import { formatWorkOrderNumber } from './work-order-codes.js';
+import { moneyText } from './work-order-totals.js';
 import {
   canChangeItems,
   WORK_ORDER_STATUS_LABELS,
@@ -355,8 +356,4 @@ export function describeChanges(
 /** «2» si es entera, «1.25» si no: nadie dice «2.00 filtros». */
 function quantityText(quantity: Prisma.Decimal): string {
   return quantity.isInteger() ? quantity.toFixed(0) : quantity.toFixed(2);
-}
-
-function moneyText(amount: Prisma.Decimal): string {
-  return `S/ ${amount.toFixed(2)}`;
 }

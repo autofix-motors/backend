@@ -65,6 +65,14 @@ export function workOrderAmounts(
   };
 }
 
+/**
+ * Un monto como se escribe en la línea de tiempo: «S/ 35.00». Los ítems y los
+ * presupuestos lo usan igual, para que el mismo monto se lea igual.
+ */
+export function moneyText(amount: Prisma.Decimal): string {
+  return `S/ ${amount.toFixed(2)}`;
+}
+
 function roundCents(value: Prisma.Decimal): Prisma.Decimal {
   return value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
