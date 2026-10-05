@@ -51,6 +51,20 @@ Reglas:
 
 ## 2026-10-04
 
+### Movimientos de stock — Eduardo Huarcaya · 20:40
+commits [`4aab90d`](../../commit/4aab90d) · [`3659689`](../../commit/3659689)
+
+Kardex del grupo `inventory` (`/stock-movements`): compras y ajustes solo para
+`ADMIN`, listado (búsqueda por producto y nota; filtros por tipo, producto y
+rango de días de Lima) y detalle para los dos roles, el costo solo para
+`ADMIN`. El stock se mueve con `ProductsService.applyStockChange` en la misma
+transacción que el movimiento y nunca queda negativo (409). Sin edición ni
+borrado: un error se corrige con un ajuste.
+
+> **IMPORTANTE** — Sin migración. Una compra cambia `Product.cost` al costo de
+> la compra. No se probó contra la base: Postgres local no acepta conexiones
+> (scripts de flujo y de datos listos, sin correr).
+
 ### Repuestos e insumos — Eduardo Huarcaya · 20:05
 commits [`a3a4558`](../../commit/a3a4558) · [`2fda56f`](../../commit/2fda56f)
 

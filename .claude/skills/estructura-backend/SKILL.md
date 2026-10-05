@@ -430,7 +430,16 @@ export class CreateCustomerDto {
   `@IsQuantity('El stock mínimo')` (`src/core/validation/quantity.ts`). Las
   reglas de `Decimal(10, 2)` viven una vez en `decimal.ts`; `money.ts` y
   `quantity.ts` solo ponen sus mensajes. Ejemplo real:
-  `modules/inventory/products/dto/`.
+  `modules/inventory/products/dto/`. La cantidad de un **movimiento** nunca
+  es 0: `@IsMovementQuantity('La cantidad', { signed })`, mayor que 0 sin
+  `signed` (una compra) y con su signo con `signed` (un ajuste). Ejemplo
+  real: `modules/inventory/stock-movements/dto/`.
+- **Un día sin hora** (un filtro `from`/`to`) se valida con
+  `@IsDateOnly('La fecha desde')` (`src/core/validation/date-only.ts`):
+  `AAAA-MM-DD` y que el día exista. Es un día **de Lima**: el `where` lo
+  convierte con `limaDayRange(from, to)` (`src/shared/lima-dates.ts`), con
+  `to` inclusivo. Tomarlo en UTC correría al día siguiente lo registrado
+  después de las 19:00.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
@@ -681,6 +690,49 @@ relación del propio modelo con `include` (el cliente resumido de cada vehículo
 sí está permitido: es la consulta del módulo dueño de `Vehicle`.
 
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
+
+### Transacción con stock
+
+El stock de `Product` es la suma de sus movimientos, guardada aparte
+(redundancia deliberada): el movimiento y el cambio de stock se guardan en la
+**misma transacción**, o ninguno. La tabla de productos es de `products`, así
+que nadie más la escribe: el cambio se le pide a su service, pasándole la
+transacción.
+
+```ts
+// stock-movements.service.ts (resumido)
+purchase(dto: CreatePurchaseDto, createdById: string) {
+  return this.prisma.$transaction((tx) =>
+    this.record(tx, { type: 'PURCHASE', ...dto, createdById }),
+  );
+}
+
+async record(tx: Prisma.TransactionClient, movement: NewStockMovement) {
+  const product = await this.products.applyStockChange(tx, movement);
+  return tx.stockMovement.create({ data: { …, unitCost: product.cost } });
+}
+```
+
+- **`ProductsService.applyStockChange(tx, { productId, type, quantity,
+  unitCost? })`** es la única escritura del stock y del costo. La salida es un
+  solo `updateMany` con `stock: { gte: -Δ }` en el `where` e `increment` en el
+  `data`: comparar y descontar en la misma sentencia hace que dos salidas a la
+  vez no dejen el stock negativo (si `count` es 0, 409 «Stock insuficiente:
+  quedan X de CÓDIGO»). Leer, comparar y escribir en dos pasos no lo protege.
+  Una compra actualiza el costo; compras y ajustes exigen el producto activo,
+  el consumo en una orden no.
+- **`StockMovementsService.record(tx, movimiento)`** crea el movimiento y
+  mueve el stock en la transacción que recibe. Un módulo que mueve stock como
+  parte de su propia escritura (el ítem de repuesto de una orden de trabajo)
+  importa `StockMovementsModule` —que entonces exporta su service— y llama a
+  `record` dentro de **su** `$transaction`, con `type: 'WORK_ORDER'` y el
+  `workOrderItemId` (el tipo lo exige). Nunca escribe `stockMovement` ni
+  `product.stock` por su cuenta.
+- **Dentro de la transacción todo va por `tx`**, no por `this.prisma`: una
+  consulta con `this.prisma` corre fuera de la transacción y no ve lo que
+  todavía no se confirmó.
+- Ejemplo real: `modules/inventory/stock-movements/` y
+  `ProductsService.applyStockChange`.
 
 ## Servicios externos
 
