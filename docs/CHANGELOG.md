@@ -51,6 +51,20 @@ Reglas:
 
 ## 2026-10-04
 
+### Personal — Eduardo Huarcaya · 19:35
+commits [`2059dcd`](../../commit/2059dcd) · [`a50950c`](../../commit/a50950c)
+
+Módulo de usuarios (`/users`, solo `ADMIN`): listado con búsqueda por nombre y
+correo, filtros por rol y estado, alta con contraseña inicial (argon2id),
+edición, cambio de contraseña y borrado real (409 si tiene historial). Nadie se
+desactiva, se quita el rol ni se borra a sí mismo, y siempre queda un
+administrador activo. Desactivar o cambiar rol o contraseña cierra sus sesiones
+(`SessionsService.revokeAllForUser`, exportado por `AuthModule`).
+
+> **IMPORTANTE** — El acceso de un usuario desactivado o degradado se corta al
+> vencer su JWT (hasta `ACCESS_TOKEN_MINUTES`), no al instante. Sin migración.
+> No se probó contra la base: Postgres local no acepta conexiones.
+
 ### Vehículos — Eduardo Huarcaya · 19:15
 commits [`db898eb`](../../commit/db898eb)
 

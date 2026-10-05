@@ -623,7 +623,12 @@ session(@CurrentUser() user: SessionUser) { … }
   - `@Roles` recibe `UserRole`: un rol mal escrito no compila.
 - **El rol viaja en el JWT**, así que los guards no consultan la base.
   Consecuencia: un cambio de rol o una baja tardan hasta `ACCESS_TOKEN_MINUTES`
-  en notarse. El refresco sí consulta la base y rechaza al usuario inactivo.
+  en notarse. El refresco sí consulta la base y rechaza al usuario inactivo, y
+  `users` cierra sus sesiones (`SessionsService.revokeAllForUser`) al
+  desactivarlo o cambiarle el rol o la contraseña.
+- **Una regla que depende de quién actúa** (nadie se desactiva ni se borra a sí
+  mismo) la decide el service: el controller lee `@CurrentUser()` y se lo pasa
+  como `actor: SessionUser`. Ejemplo real: `UsersService.update` y `remove`.
 - **La cookie de refresco (`afm_refresh`) solo viaja a `/auth`.** El flujo
   (rotación del refresh, detección de reuso) está explicado en los comentarios
   de `modules/core/auth/` y en el `///` de `Session`.
