@@ -9,6 +9,7 @@ import { AccessGuard } from './core/guards/access.guard.js';
 import { RolesGuard } from './core/guards/roles.guard.js';
 import { CoreModule } from './modules/core/core.module.js';
 import { CustomerModule } from './modules/customer/customer.module.js';
+import { WorkshopModule } from './modules/workshop/workshop.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CustomerModule } from './modules/customer/customer.module.js';
     // sus propios módulos.
     CoreModule,
     CustomerModule,
+    WorkshopModule,
   ],
   controllers: [AppController],
   providers: [
