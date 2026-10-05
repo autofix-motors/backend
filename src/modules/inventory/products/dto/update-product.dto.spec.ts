@@ -32,3 +32,11 @@ describe('UpdateProductDto', () => {
     expect(await messagesOf({ brand: null })).toEqual([]);
   });
 });
+
+describe('UpdateProductDto: estado', () => {
+  it('rechaza isActive en null: la columna no admite vacío', async () => {
+    expect(await messagesOf({ isActive: null })).toEqual([
+      'El estado tiene que ser verdadero o falso',
+    ]);
+  });
+});
