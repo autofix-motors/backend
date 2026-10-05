@@ -51,6 +51,15 @@ Reglas:
 
 ## 2026-10-04
 
+### Vehículos — Eduardo Huarcaya · 19:15
+commits [`db898eb`](../../commit/db898eb)
+
+Módulo de vehículos: listado paginado con búsqueda por placa, marca, modelo y
+cliente, filtros por cliente y marca, y alta, edición y borrado real (409 si
+tiene órdenes). Placa y VIN normalizados y únicos; el dueño se verifica con
+`CustomersService`, que ahora se exporta. `GET /vehicles/brands` alimenta el
+filtro por marca.
+
 ### Clientes y respuesta base en toda la API — Eduardo Huarcaya · 18:30
 
 Módulo de clientes (listado paginado con búsqueda por nombre y documento,

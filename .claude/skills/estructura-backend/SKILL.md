@@ -459,7 +459,8 @@ usuario campo por campo para que el hash de la contraseña nunca salga.
   `180.50` viaja como `"180.5"` y el céntimo se pierde al cuadrar totales.
 - La respuesta se declara con `@ApiBaseResponse(Modelo)` o
   `@ApiPaginatedResponse(Modelo)` (`src/shared/swagger/`), no con
-  `@ApiOkResponse`. El tipo de retorno de TypeScript no alcanza: sin el plugin
+  `@ApiOkResponse`. Una lista corta sin paginar (las opciones de un filtro,
+  como `GET /vehicles/brands`) es `@ApiBaseResponse(Modelo, { isArray: true })`. El tipo de retorno de TypeScript no alcanza: sin el plugin
   de CLI de `@nestjs/swagger` —que este proyecto no usa—, el decorador es la
   única fuente de la documentación, y Swagger no entiende el genérico
   `BaseResponseDto<T>` sin ayuda.
@@ -634,6 +635,11 @@ desde `work-orders.service.ts`.
 > `work-orders` lee la tabla de `users` por su cuenta, el día que `users` cambie
 > una columna nadie se entera hasta que falla en ejecución, porque el cambio no
 > aparece en ningún import.
+
+El ejemplo real: `VehiclesModule` importa `CustomersModule`, que exporta
+`CustomersService`, y verifica al dueño con `customers.findOne()`. Leer la
+relación del propio modelo con `include` (el cliente resumido de cada vehículo)
+sí está permitido: es la consulta del módulo dueño de `Vehicle`.
 
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
 
