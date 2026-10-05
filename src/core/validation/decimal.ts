@@ -12,22 +12,27 @@ const DECIMAL_PATTERN = /^(-?)(\d+)(?:\.(\d+))?$/;
 const MAX_INTEGER_DIGITS = 8;
 
 /**
- * Por qué el valor no cabe en un `Decimal(10, 2)` no negativo, o `null` si
- * cabe. `label` es el nombre del campo en el mensaje («El costo») e
- * `invalidMessage`, el mensaje para lo que ni siquiera tiene forma de número.
+ * Por qué el valor no cabe en un `Decimal(10, 2)`, o `null` si cabe. `label`
+ * es el nombre del campo en el mensaje («El costo») e `invalidMessage`, el
+ * mensaje para lo que ni siquiera tiene forma de número. Sin `signed` exige
+ * que no sea negativo, que es lo que piden los montos y casi todas las
+ * cantidades; con `signed` acepta el signo (un ajuste de stock que resta).
  */
 export function decimalError(
   value: unknown,
   label: string,
   invalidMessage: string,
+  { signed = false }: { signed?: boolean } = {},
 ): string | null {
   const match = typeof value === 'string' ? DECIMAL_PATTERN.exec(value) : null;
   if (!match) return invalidMessage;
   const [, sign, integer, decimals = ''] = match;
-  if (sign) return `${label} no puede ser negativo`;
+  if (sign && !signed) return `${label} no puede ser negativo`;
   if (decimals.length > 2) return `${label} tiene como máximo 2 decimales`;
   if (integer.replace(/^0+(?=\d)/, '').length > MAX_INTEGER_DIGITS) {
-    return `${label} es como máximo 99999999.99`;
+    return signed
+      ? `${label} va de -99999999.99 a 99999999.99`
+      : `${label} es como máximo 99999999.99`;
   }
   return null;
 }
