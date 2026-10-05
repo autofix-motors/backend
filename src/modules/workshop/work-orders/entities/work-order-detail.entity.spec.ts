@@ -87,6 +87,7 @@ const row = (overrides: Record<string, unknown> = {}) => ({
     },
   ],
   items: [item(), part],
+  quotes: [],
   ...overrides,
 });
 
@@ -211,6 +212,135 @@ describe('WorkOrderDetail: ítems y montos', () => {
       labor: '80.00',
       parts: '58.35',
       total: '138.35',
+    });
+  });
+});
+
+describe('WorkOrderDetail: presupuestos', () => {
+  const SENT_AT = new Date('2026-10-02T15:00:00.000Z');
+  const quoteItem = (overrides: Record<string, unknown> = {}) => ({
+    quoteItemId: 'qi1',
+    quoteId: 'q2',
+    type: 'PRODUCT' as const,
+    description: 'PF-TOY-0446 · Pastillas de freno delanteras',
+    quantity: D('1.5'),
+    unitPrice: D('38.90'),
+    createdAt: SENT_AT,
+    ...overrides,
+  });
+  const quote = (overrides: Record<string, unknown> = {}) => ({
+    quoteId: 'q2',
+    workOrderId: 'wo-1',
+    version: 2,
+    status: 'APPROVED' as const,
+    total: D('138.35'),
+    sentById: 'u0',
+    sentAt: SENT_AT,
+    decidedById: 'u0',
+    decidedAt: RECEIVED_AT,
+    decisionChannel: 'WHATSAPP' as const,
+    decisionNote: 'Aprobó por WhatsApp',
+    createdAt: SENT_AT,
+    updatedAt: RECEIVED_AT,
+    sentBy: { userId: 'u0', name: 'Administrador', email: 'admin@x.pe' },
+    decidedBy: { userId: 'u0', name: 'Administrador' },
+    items: [
+      quoteItem({
+        quoteItemId: 'qi0',
+        type: 'SERVICE',
+        quantity: D('1'),
+        unitPrice: D('80'),
+      }),
+      quoteItem(),
+    ],
+    ...overrides,
+  });
+
+  it('cada versión con su total, quién la envió y decidió, y sus ítems con subtotal', () => {
+    const json = JSON.parse(
+      JSON.stringify(
+        new WorkOrderDetail(
+          row({
+            quotes: [
+              quote(),
+              quote({
+                quoteId: 'q1',
+                version: 1,
+                status: 'REJECTED',
+                total: D('200'),
+                decisionChannel: 'PHONE',
+                decisionNote: null,
+                items: [],
+              }),
+            ],
+          }),
+          MECHANIC,
+          '2026-10-04',
+        ),
+      ),
+    );
+    // El orden es el que trae la consulta (versión descendente).
+    expect(json.quotes.map((q: { version: number }) => q.version)).toEqual([
+      2, 1,
+    ]);
+    expect(json.quotes[0]).toEqual({
+      quoteId: 'q2',
+      version: 2,
+      status: 'APPROVED',
+      total: '138.35',
+      sentAt: SENT_AT.toISOString(),
+      // Solo el resumen de la persona: nada de su cuenta.
+      sentBy: { userId: 'u0', name: 'Administrador' },
+      decidedAt: RECEIVED_AT.toISOString(),
+      decidedBy: { userId: 'u0', name: 'Administrador' },
+      decisionChannel: 'WHATSAPP',
+      decisionNote: 'Aprobó por WhatsApp',
+      items: [
+        {
+          quoteItemId: 'qi0',
+          type: 'SERVICE',
+          description: 'PF-TOY-0446 · Pastillas de freno delanteras',
+          quantity: '1.00',
+          unitPrice: '80.00',
+          subtotal: '80.00',
+        },
+        {
+          quoteItemId: 'qi1',
+          type: 'PRODUCT',
+          description: 'PF-TOY-0446 · Pastillas de freno delanteras',
+          quantity: '1.50',
+          unitPrice: '38.90',
+          // 1.5 × 38.90 = 58.35, sin pasar por number.
+          subtotal: '58.35',
+        },
+      ],
+    });
+    expect(json.quotes[1].total).toBe('200.00');
+  });
+
+  it('una versión pendiente no tiene decisión', () => {
+    const [pending] = new WorkOrderDetail(
+      row({
+        quotes: [
+          quote({
+            status: 'PENDING',
+            decidedById: null,
+            decidedAt: null,
+            decisionChannel: null,
+            decisionNote: null,
+            decidedBy: null,
+          }),
+        ],
+      }),
+      ADMIN,
+      '2026-10-04',
+    ).quotes;
+    expect(pending).toMatchObject({
+      status: 'PENDING',
+      decidedAt: null,
+      decidedBy: null,
+      decisionChannel: null,
+      decisionNote: null,
     });
   });
 });

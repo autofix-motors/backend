@@ -1,10 +1,13 @@
 import { WorkOrderStatus } from '../../../generated/prisma/enums.js';
 import {
+  canApplySystemTransition,
   canChangeItems,
   canTransition,
   isClosed,
   isOverdue,
   MANUAL_TRANSITIONS,
+  SYSTEM_TRANSITIONS,
+  type SystemTransition,
 } from './work-order-status.js';
 
 // La tabla se prueba entera, par por par y para los dos roles: un cambio en
@@ -69,6 +72,51 @@ describe('canTransition', () => {
   it('un estado no pasa a sí mismo', () => {
     for (const status of STATUSES) {
       expect(canTransition(status, status, 'ADMIN')).toBe(false);
+    }
+  });
+});
+
+describe('canApplySystemTransition', () => {
+  /** Las del presupuesto, escritas a mano a partir del alcance. */
+  const SYSTEM_ALLOWED = new Set([
+    'QUOTE_SENT:DIAGNOSIS→WAITING_APPROVAL',
+    'QUOTE_SENT:IN_PROGRESS→WAITING_APPROVAL',
+    'QUOTE_SENT:WAITING_PARTS→WAITING_APPROVAL',
+    'QUOTE_APPROVED:WAITING_APPROVAL→IN_PROGRESS',
+    'QUOTE_REJECTED:WAITING_APPROVAL→DIAGNOSIS',
+  ]);
+  const transitions = Object.keys(SYSTEM_TRANSITIONS) as SystemTransition[];
+  const pairs = transitions.flatMap((transition) =>
+    STATUSES.map((from) => [transition, from] as const),
+  );
+
+  it.each(pairs)('%s desde %s', (transition, from) => {
+    const to = SYSTEM_TRANSITIONS[transition].to;
+    expect(canApplySystemTransition(transition, from)).toBe(
+      SYSTEM_ALLOWED.has(`${transition}:${from}→${to}`),
+    );
+  });
+
+  it('ninguna es un botón: no están en la tabla manual', () => {
+    for (const transition of transitions) {
+      const { from, to } = SYSTEM_TRANSITIONS[transition];
+      for (const status of from) {
+        // Aprobar desde la espera sería «Iniciar reparación»; rechazar,
+        // «Iniciar diagnóstico». Ninguno se ofrece a mano.
+        expect(canTransition(status, to, 'ADMIN')).toBe(false);
+      }
+    }
+  });
+
+  it('no se envía un presupuesto sin diagnosticar, ya esperando, lista o cerrada', () => {
+    for (const from of [
+      'RECEIVED',
+      'WAITING_APPROVAL',
+      'READY',
+      'DELIVERED',
+      'CANCELLED',
+    ] as const) {
+      expect(canApplySystemTransition('QUOTE_SENT', from)).toBe(false);
     }
   });
 });

@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { limaToday } from '../../../../shared/lima-dates.js';
 import { workOrderAmounts } from '../work-order-totals.js';
+import { Quote, type QuoteWithRelations } from './quote.entity.js';
 import {
   WorkOrderEvent,
   type WorkOrderEventWithAuthor,
@@ -20,12 +21,13 @@ export type WorkOrderWithTimeline = Omit<WorkOrderWithRelations, 'items'> & {
   createdBy: WorkOrderUserModel;
   events: WorkOrderEventWithAuthor[];
   items: WorkOrderItemWithProduct[];
+  quotes: QuoteWithRelations[];
 };
 
 /**
  * Una orden completa, para su pantalla de detalle: lo del listado más el
  * diagnóstico, la cancelación, quién la registró, la línea de tiempo, los
- * servicios y repuestos y sus montos. El costo de los repuestos y su margen
+ * servicios y repuestos con sus montos y los presupuestos. El costo de los repuestos y su margen
  * salen solo con `includeCosts` (ADMIN).
  *
  * Extiende `WorkOrder` (una clase concreta, con `super(order)`), no una base
@@ -50,6 +52,7 @@ export class WorkOrderDetail extends WorkOrder {
     this.totals = new WorkOrderTotals(workOrderAmounts(order.items), {
       includeCosts,
     });
+    this.quotes = order.quotes.map((quote) => new Quote(quote));
   }
 
   @ApiProperty({ type: String, nullable: true })
@@ -78,4 +81,11 @@ export class WorkOrderDetail extends WorkOrder {
 
   @ApiProperty({ type: WorkOrderTotals })
   totals: WorkOrderTotals;
+
+  @ApiProperty({
+    type: [Quote],
+    description:
+      'Los presupuestos enviados, de la versión más nueva a la más vieja',
+  })
+  quotes: Quote[];
 }

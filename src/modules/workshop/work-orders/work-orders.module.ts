@@ -6,6 +6,7 @@ import { ProductsModule } from '../../inventory/products/products.module.js';
 import { StockMovementsModule } from '../../inventory/stock-movements/stock-movements.module.js';
 import { ServiceCatalogModule } from '../service-catalog/service-catalog.module.js';
 import { WorkOrderItemsService } from './work-order-items.service.js';
+import { WorkOrderQuotesService } from './work-order-quotes.service.js';
 import { WorkOrdersController } from './work-orders.controller.js';
 import { WorkOrdersService } from './work-orders.service.js';
 
@@ -24,6 +25,6 @@ import { WorkOrdersService } from './work-orders.service.js';
     StockMovementsModule,
   ],
   controllers: [WorkOrdersController],
-  providers: [WorkOrdersService, WorkOrderItemsService],
+  providers: [WorkOrdersService, WorkOrderItemsService, WorkOrderQuotesService],
 })
 export class WorkOrdersModule {}

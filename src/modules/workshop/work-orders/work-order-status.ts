@@ -17,15 +17,11 @@ const {
  * copia en `work-orders.schemas.ts` para dibujar solo los botones que la API
  * va a aceptar.
  *
- * Cómo se extiende (módulo de presupuestos): `WAITING_APPROVAL` no se pide a
- * mano. Entra al **enviar** un presupuesto (DIAGNOSIS → WAITING_APPROVAL) y
- * sale al **registrar la decisión** (→ IN_PROGRESS si se aprueba, → DIAGNOSIS
- * si se rechaza). Esas salidas no van en esta tabla, que es la de los botones:
- * las aplica el service de presupuestos dentro de su propia transacción, con
- * su propia regla (solo ADMIN decide, solo un presupuesto PENDING), creando el
- * mismo `WorkOrderEvent` que un cambio manual. Si algún día una de esas salidas
- * también se quiere a mano (por ejemplo, cancelar la espera y volver a
- * diagnóstico), se agrega aquí y en la copia del frontend, con su test.
+ * `WAITING_APPROVAL` no se pide a mano: entra y sale con el presupuesto, por
+ * las transiciones de sistema (`SYSTEM_TRANSITIONS`, abajo). Desde ahí, a mano,
+ * solo se cancela. Si algún día una de esas salidas también se quiere a mano
+ * (por ejemplo, cancelar la espera y volver a diagnóstico), se agrega aquí y
+ * en la copia del frontend, con su test.
  */
 export const MANUAL_TRANSITIONS: Readonly<
   Record<WorkOrderStatus, readonly WorkOrderStatus[]>
@@ -41,6 +37,48 @@ export const MANUAL_TRANSITIONS: Readonly<
   [DELIVERED]: [],
   [CANCELLED]: [],
 };
+
+/**
+ * Los cambios de estado que **no son botones**: los aplica el presupuesto
+ * (`WorkOrderQuotesService`), dentro de su transacción y con su regla (solo
+ * ADMIN, y la decisión solo sobre la versión PENDING), creando el mismo
+ * `WorkOrderEvent` que un cambio manual. No van en `MANUAL_TRANSITIONS`
+ * porque ahí la orden se mueve sola: «Esperando aprobación» no se elige, se
+ * llega enviando el presupuesto, y se sale registrando la respuesta del
+ * cliente. El frontend no las copia: no dibuja botones de estado para ellas.
+ */
+export const SYSTEM_TRANSITIONS = {
+  /**
+   * Enviar un presupuesto: al terminar el diagnóstico o, si aparece otro
+   * problema, a mitad de la reparación (también esperando repuestos).
+   */
+  QUOTE_SENT: {
+    from: [DIAGNOSIS, IN_PROGRESS, WAITING_PARTS],
+    to: WAITING_APPROVAL,
+  },
+  /** El cliente lo aprobó: se repara. */
+  QUOTE_APPROVED: { from: [WAITING_APPROVAL], to: IN_PROGRESS },
+  /**
+   * El cliente lo rechazó: la orden vuelve al taller, que ajusta el
+   * presupuesto y lo vuelve a enviar, o la cancela.
+   */
+  QUOTE_REJECTED: { from: [WAITING_APPROVAL], to: DIAGNOSIS },
+} as const satisfies Record<
+  string,
+  { from: readonly WorkOrderStatus[]; to: WorkOrderStatus }
+>;
+
+export type SystemTransition = keyof typeof SYSTEM_TRANSITIONS;
+
+/** Si la transición de sistema se puede aplicar a una orden en `from`. */
+export function canApplySystemTransition(
+  transition: SystemTransition,
+  from: WorkOrderStatus,
+): boolean {
+  const allowed: readonly WorkOrderStatus[] =
+    SYSTEM_TRANSITIONS[transition].from;
+  return allowed.includes(from);
+}
 
 /**
  * Los estados a los que el mecánico puede llevar su orden: el trabajo del

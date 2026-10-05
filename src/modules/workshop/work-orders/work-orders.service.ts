@@ -73,6 +73,16 @@ export const WITH_TIMELINE = {
     include: { product: { select: { unit: true } } },
     orderBy: [{ createdAt: 'asc' }, { workOrderItemId: 'asc' }],
   },
+  // El presupuesto es parte de la orden (vive en este módulo): la versión más
+  // nueva primero, que es la que importa. Sus ítems, en el orden de la foto.
+  quotes: {
+    include: {
+      sentBy: USER_SUMMARY,
+      decidedBy: USER_SUMMARY,
+      items: { orderBy: [{ createdAt: 'asc' }, { quoteItemId: 'asc' }] },
+    },
+    orderBy: { version: 'desc' },
+  },
 } satisfies Prisma.WorkOrderInclude;
 
 const NOT_FOUND = 'No se encontró la orden de trabajo';

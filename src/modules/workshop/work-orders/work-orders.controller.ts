@@ -22,16 +22,22 @@ import type { SessionUser } from '../../../core/auth/session-user.js';
 import { CurrentUser } from '../../../core/decorators/current-user.decorator.js';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { ItemType, UserRole } from '../../../generated/prisma/enums.js';
+import {
+  ItemType,
+  QuoteStatus,
+  UserRole,
+} from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
   ApiPaginatedResponse,
 } from '../../../shared/swagger/api-response.decorators.js';
 import { ChangeWorkOrderStatusDto } from './dto/change-work-order-status.dto.js';
+import { CreateQuoteDto } from './dto/create-quote.dto.js';
 import { CreateWorkOrderItemDto } from './dto/create-work-order-item.dto.js';
 import { CreateWorkOrderNoteDto } from './dto/create-work-order-note.dto.js';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto.js';
+import { DecideQuoteDto } from './dto/decide-quote.dto.js';
 import { ListWorkOrdersQueryDto } from './dto/list-work-orders-query.dto.js';
 import { UpdateWorkOrderDiagnosisDto } from './dto/update-work-order-diagnosis.dto.js';
 import { UpdateWorkOrderItemDto } from './dto/update-work-order-item.dto.js';
@@ -40,6 +46,7 @@ import { WorkOrderDetail } from './entities/work-order-detail.entity.js';
 import type { WorkOrderWithTimeline } from './entities/work-order-detail.entity.js';
 import { WorkOrder } from './entities/work-order.entity.js';
 import { WorkOrderItemsService } from './work-order-items.service.js';
+import { WorkOrderQuotesService } from './work-order-quotes.service.js';
 import { WORK_ORDER_STATUS_LABELS } from './work-order-status.js';
 import { WorkOrdersService } from './work-orders.service.js';
 
@@ -58,8 +65,9 @@ function detail(order: WorkOrderWithTimeline, actor: SessionUser) {
 
 /**
  * Las órdenes de trabajo. El administrador las registra, las edita, las asigna
- * y las borra; el mecánico trabaja las suyas (diagnóstico, estado, notas,
- * servicios y repuestos).
+ * y las borra, y envía los presupuestos y registra la respuesta del cliente;
+ * el mecánico trabaja las suyas (diagnóstico, estado, notas, servicios y
+ * repuestos) y ve sus presupuestos.
  * Por eso el rol va en cada método y no en la clase.
  */
 @ApiTags('work-orders')
@@ -68,6 +76,7 @@ export class WorkOrdersController {
   constructor(
     private readonly workOrders: WorkOrdersService,
     private readonly items: WorkOrderItemsService,
+    private readonly quotes: WorkOrderQuotesService,
   ) {}
 
   @Get()
@@ -289,6 +298,54 @@ export class WorkOrdersController {
   ): Promise<BaseResponseDto<null>> {
     await this.items.remove(workOrderId, workOrderItemId, actor);
     return BaseResponseDto.success(null, 'Ítem quitado de la orden');
+  }
+
+  @Post(':workOrderId/quotes')
+  @Roles(UserRole.ADMIN)
+  @ApiBaseResponse(WorkOrderDetail, { status: HttpStatus.CREATED })
+  @ApiBadRequestResponse({ description: 'La orden no tiene ítems' })
+  @ApiNotFoundResponse({ description: 'No se encontró la orden' })
+  @ApiConflictResponse({
+    description:
+      'La orden no está en diagnóstico, en reparación ni esperando repuestos, o cambió mientras tanto',
+  })
+  async sendQuote(
+    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Body() dto: CreateQuoteDto,
+    @CurrentUser() actor: SessionUser,
+  ): Promise<BaseResponseDto<WorkOrderDetail>> {
+    const order = await this.quotes.send(workOrderId, dto, actor);
+    return BaseResponseDto.success(
+      detail(order, actor),
+      `Presupuesto v${order.quotes[0].version} enviado: la orden espera la aprobación del cliente`,
+      HttpStatus.CREATED,
+    );
+  }
+
+  @Post(':workOrderId/quotes/:quoteId/decision')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN)
+  @ApiBaseResponse(WorkOrderDetail)
+  @ApiNotFoundResponse({
+    description: 'No se encontró la orden, o el presupuesto no es de ella',
+  })
+  @ApiConflictResponse({
+    description:
+      'El presupuesto ya se decidió o fue reemplazado, la orden no espera aprobación, o cambió mientras tanto',
+  })
+  async decideQuote(
+    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('quoteId', ParseIdPipe) quoteId: string,
+    @Body() dto: DecideQuoteDto,
+    @CurrentUser() actor: SessionUser,
+  ): Promise<BaseResponseDto<WorkOrderDetail>> {
+    const order = await this.quotes.decide(workOrderId, quoteId, dto, actor);
+    return BaseResponseDto.success(
+      detail(order, actor),
+      dto.decision === QuoteStatus.APPROVED
+        ? 'Presupuesto aprobado: la orden pasa a reparación'
+        : 'Presupuesto rechazado: la orden vuelve a diagnóstico',
+    );
   }
 
   @Delete(':workOrderId')
