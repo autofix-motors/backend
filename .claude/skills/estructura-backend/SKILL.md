@@ -417,7 +417,11 @@ export class CreateCustomerDto {
   `@nestjs/mapped-types`, para conservar la documentación, y **siempre con
   `{ skipNullProperties: false }`**: con el default, `{ "name": null }` salta la
   validación y la base lo rechaza con un 500. Los opcionales siguen aceptando
-  `null` por su propio `@IsOptional`.
+  `null` por su propio `@IsOptional`. Un campo **opcional pero no anulable**
+  (un enum con default, como el `status` de una herramienta) usa
+  `@ValidateIf((_dto, value) => value !== undefined)` en vez de `@IsOptional`:
+  así un `null` se valida (400) en vez de llegar a la base. Ejemplo real:
+  `modules/inventory/tools/dto/create-tool.dto.ts`.
 - **Un monto en soles se valida con `@ToMoneyText()` y `@IsMoney('El precio…')`**
   (`src/core/validation/money.ts`): acepta texto o número, lo deja como
   texto y exige no negativo, hasta 2 decimales y hasta 99999999.99 (lo que cabe
@@ -687,7 +691,9 @@ desde `work-orders.service.ts`.
 El ejemplo real: `VehiclesModule` importa `CustomersModule`, que exporta
 `CustomersService`, y verifica al dueño con `customers.findOne()`. Leer la
 relación del propio modelo con `include` (el cliente resumido de cada vehículo)
-sí está permitido: es la consulta del módulo dueño de `Vehicle`.
+sí está permitido: es la consulta del módulo dueño de `Vehicle`. Igual
+`ToolsModule` con `UsersModule` (`users.findOne()` para asignar una
+herramienta solo a un usuario activo).
 
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
 

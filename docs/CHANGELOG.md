@@ -51,6 +51,20 @@ Reglas:
 
 ## 2026-10-04
 
+### Herramientas — Eduardo Huarcaya · 21:05
+commits [`b2635aa`](../../commit/b2635aa)
+
+Tercer módulo del grupo `inventory` (`/tools`): listado (búsqueda por código,
+nombre y marca; filtros por estado, quién la tiene y si está en el almacén) y
+detalle para `ADMIN` y `MECHANIC`; alta, edición, entrega o devolución rápida
+(`PUT /tools/:toolId/assignment`) y borrado real (409 si alguien la tiene) solo
+para `ADMIN`. Solo una herramienta operativa se asigna, y solo a un usuario
+activo (verificado con `UsersService`, que `UsersModule` ahora exporta); en
+reparación o de baja vuelve sola al almacén.
+
+> **IMPORTANTE** — Sin migración. No se probó contra la base: Postgres local
+> no acepta conexiones (scripts de flujo y de datos listos, sin correr).
+
 ### Movimientos de stock — Eduardo Huarcaya · 20:40
 commits [`4aab90d`](../../commit/4aab90d) · [`3659689`](../../commit/3659689)
 
