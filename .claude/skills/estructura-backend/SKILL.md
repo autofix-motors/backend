@@ -418,6 +418,13 @@ export class CreateCustomerDto {
   `{ skipNullProperties: false }`**: con el default, `{ "name": null }` salta la
   validación y la base lo rechaza con un 500. Los opcionales siguen aceptando
   `null` por su propio `@IsOptional`.
+- **Un monto en soles se valida con `@ToMoneyText()` y `@IsMoney('El precio…')`**
+  (`src/core/validation/money.ts`): acepta texto o número, lo deja como
+  texto y exige no negativo, hasta 2 decimales y hasta 99999999.99 (lo que cabe
+  en `Decimal(10, 2)`). Nunca `@IsNumber`: un `number` redondea en silencio
+  («12.345» pasaría como 12.35). En una query, un `Transform` que convierta el
+  texto vacío en `undefined` va en lugar de `@ToMoneyText()`. Ejemplo real:
+  `modules/workshop/service-catalog/dto/`.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
@@ -614,6 +621,11 @@ login(@Body() dto: LoginDto) { … }
 session(@CurrentUser() user: SessionUser) { … }
 ```
 
+- **Si los roles cambian según el endpoint, `@Roles` va en cada método** y no
+  en la clase: el del método reemplaza al de la clase (`getAllAndOverride`), y
+  mezclarlos obliga a leer los dos para saber quién entra. Ejemplo real:
+  `ServiceCatalogController`, que el mecánico consulta y solo el administrador
+  modifica.
 - **Un endpoint público se marca con `@Public()`.** Un endpoint desprotegido
   tiene que ser una decisión visible, no un olvido.
 - **Los roles los define el código**: son el enum `UserRole` de `core.prisma`

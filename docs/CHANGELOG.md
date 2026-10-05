@@ -51,6 +51,19 @@ Reglas:
 
 ## 2026-10-04
 
+### Catálogo de servicios — Eduardo Huarcaya · 19:50
+commits [`2cf1d2e`](../../commit/2cf1d2e)
+
+Primer módulo del grupo `workshop` (`/service-catalog`): listado con búsqueda
+por nombre y descripción, filtros por estado y rango de precio, y detalle para
+`ADMIN` y `MECHANIC`; alta, edición y borrado real (409 si ya se usó en
+órdenes) solo para `ADMIN`. Nombre único sin distinguir mayúsculas. El precio se
+valida como monto en soles con `IsMoney` (`core/validation/money.ts`) y sale
+como texto con dos decimales.
+
+> **IMPORTANTE** — Sin migración. No se probó contra la base: Postgres local
+> no acepta conexiones.
+
 ### Personal — Eduardo Huarcaya · 19:35
 commits [`2059dcd`](../../commit/2059dcd) · [`a50950c`](../../commit/a50950c)
 
