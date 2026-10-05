@@ -23,3 +23,11 @@ describe('UpdateCustomerDto', () => {
     expect(await messagesOf({ email: null, notes: null })).toEqual([]);
   });
 });
+
+describe('UpdateCustomerDto: estado', () => {
+  it('rechaza isActive en null: la columna no admite vacío', async () => {
+    expect(await messagesOf({ isActive: null })).toEqual([
+      'El estado tiene que ser verdadero o falso',
+    ]);
+  });
+});
