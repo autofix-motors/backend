@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { IsMoney, ToMoneyText } from '../../../../core/validation/money.js';
 import { TrimToNull } from '../../../../core/validation/trim-to-null.transform.js';
@@ -47,7 +48,11 @@ export class CreateServiceCatalogItemDto {
   laborPrice: string;
 
   @ApiPropertyOptional({ default: true })
-  @IsOptional()
+  // Opcional pero no anulable: con @IsOptional un `null` pasaría sin validar y
+  // la base lo rechazaría con un 500 (la columna no admite vacío).
+  @ValidateIf(
+    (_dto: CreateServiceCatalogItemDto, value: unknown) => value !== undefined,
+  )
   @IsBoolean({ message: 'El estado tiene que ser verdadero o falso' })
   isActive?: boolean;
 }

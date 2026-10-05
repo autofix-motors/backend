@@ -27,3 +27,11 @@ describe('UpdateServiceCatalogItemDto', () => {
     expect(await messagesOf({ description: null })).toEqual([]);
   });
 });
+
+describe('UpdateServiceCatalogItemDto: estado', () => {
+  it('rechaza isActive en null: la columna no admite vacío', async () => {
+    expect(await messagesOf({ isActive: null })).toEqual([
+      'El estado tiene que ser verdadero o falso',
+    ]);
+  });
+});
