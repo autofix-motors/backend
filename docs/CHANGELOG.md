@@ -51,6 +51,19 @@ Reglas:
 
 ## 2026-10-04
 
+### Órdenes de trabajo — Eduardo Huarcaya · 21:50
+commits [`085b208`](../../commit/085b208)
+
+Segundo módulo del grupo `workshop` (`/work-orders`): la orden y su línea de
+tiempo. Alta, edición, asignación y borrado (sin ítems, presupuestos ni pagos)
+para `ADMIN`; listado (número, placa, cliente y código; estados, mecánico,
+vehículo, cliente, vencidas y días de ingreso) y detalle con eventos, y
+diagnóstico, cambios de estado (tabla `canTransition`) y notas para `ADMIN` y
+el mecánico asignado, que solo ve las suyas. `VehiclesModule` exporta su service.
+
+> **IMPORTANTE** — Sin migración. No se probó contra la base: Postgres local
+> no acepta conexiones (scripts de flujo y de datos listos, sin correr).
+
 ### Herramientas — Eduardo Huarcaya · 21:05
 commits [`b2635aa`](../../commit/b2635aa)
 

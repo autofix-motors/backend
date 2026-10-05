@@ -443,7 +443,10 @@ export class CreateCustomerDto {
   `AAAA-MM-DD` y que el día exista. Es un día **de Lima**: el `where` lo
   convierte con `limaDayRange(from, to)` (`src/shared/lima-dates.ts`), con
   `to` inclusivo. Tomarlo en UTC correría al día siguiente lo registrado
-  después de las 19:00.
+  después de las 19:00. «Hoy» es `limaToday()` (una fecha prometida no
+  anterior a hoy, una orden vencida). Una columna `@db.Date` se escribe con
+  `toDateColumn(día)` y sale como día con `fromDateColumn(fecha)`
+  (`src/shared/date-column.ts`). Ejemplo real: `modules/workshop/work-orders/`.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
@@ -693,7 +696,9 @@ El ejemplo real: `VehiclesModule` importa `CustomersModule`, que exporta
 relación del propio modelo con `include` (el cliente resumido de cada vehículo)
 sí está permitido: es la consulta del módulo dueño de `Vehicle`. Igual
 `ToolsModule` con `UsersModule` (`users.findOne()` para asignar una
-herramienta solo a un usuario activo).
+herramienta solo a un usuario activo). Y `WorkOrdersModule` con
+`VehiclesModule`, `CustomersModule` y `UsersModule`: el vehículo que ingresa,
+su dueño (que tiene que estar activo) y el mecánico, cada uno por su service.
 
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
 
@@ -739,6 +744,27 @@ async record(tx: Prisma.TransactionClient, movement: NewStockMovement) {
   todavía no se confirmó.
 - Ejemplo real: `modules/inventory/stock-movements/` y
   `ProductsService.applyStockChange`.
+
+### Estados con reglas y su historial
+
+La orden de trabajo es el ejemplo real (`modules/workshop/work-orders/`):
+
+- **Las transiciones son una tabla pura** (`MANUAL_TRANSITIONS` y
+  `canTransition(from, to, role)` en `work-order-status.ts`), probada par por
+  par para cada rol. Fuera de la tabla, 409; en la tabla pero no para el rol,
+  403. Un estado al que se llega por otro camino (el presupuesto lleva a
+  `WAITING_APPROVAL`) no va en la tabla de los botones: lo aplica el service
+  de ese otro módulo, con su regla, creando el mismo evento.
+- **El cambio y su evento se escriben juntos**, anidando el evento en la misma
+  escritura (`update({ data: { status, events: { create: … } } })`): Prisma
+  los guarda en una transacción, sin `$transaction` explícita.
+- **El estado leído va en el `where`** de la escritura (`{ workOrderId,
+  status: from }`): si otro lo cambió entre medio, Prisma lanza P2025 y se
+  responde 409 «cambió mientras tanto», en vez de pisarlo.
+- **Un recurso que un rol solo ve si le pertenece** (la orden del mecánico
+  asignado) da 404 a los demás, no 403: el 403 confirmaría que existe. El
+  `findOne(id, actor)` del service lo decide, y todas las acciones pasan por
+  él; en el listado, el service fuerza el filtro (`mechanicId` de la sesión).
 
 ## Servicios externos
 
