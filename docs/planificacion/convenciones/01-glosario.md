@@ -38,6 +38,8 @@ traducciones de lo mismo.
 | Movimiento de stock, kardex | `StockMovement` | `StockMovementType`: `PURCHASE` (compra), `WORK_ORDER` (consumo en OT), `ADJUSTMENT` (ajuste) |
 | Stock mínimo | `minStock` | Debajo de este valor se alerta |
 | Costo / precio de venta | `cost` / `price` | En soles (PEN) |
+| Margen | `margin` | `price − cost`, en soles. Se calcula al responder y solo lo ve `ADMIN` |
+| Stock bajo | `isLowStock`, `lowStock` | El stock está en el mínimo o debajo (`stock <= minStock`) |
 | Pago | `Payment` | Uno o varios por OT; un adelanto es un pago |
 | Método de pago | `PaymentMethod` | `CASH`, `YAPE_PLIN`, `CARD`, `TRANSFER` |
 | Seguimiento | `tracking` | La página pública y su módulo |

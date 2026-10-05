@@ -425,6 +425,12 @@ export class CreateCustomerDto {
   («12.345» pasaría como 12.35). En una query, un `Transform` que convierta el
   texto vacío en `undefined` va en lugar de `@ToMoneyText()`. Ejemplo real:
   `modules/workshop/service-catalog/dto/`.
+- **Una cantidad en la unidad de un producto** (stock mínimo, la cantidad de un
+  movimiento) se valida igual, con `@ToQuantityText()` y
+  `@IsQuantity('El stock mínimo')` (`src/core/validation/quantity.ts`). Las
+  reglas de `Decimal(10, 2)` viven una vez en `decimal.ts`; `money.ts` y
+  `quantity.ts` solo ponen sus mensajes. Ejemplo real:
+  `modules/inventory/products/dto/`.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
@@ -464,6 +470,14 @@ usuario campo por campo para que el hash de la contraseña nunca salga.
   clase existe para impedir.
 - **No uses `implements`** contra el tipo de Prisma: obliga a declarar todas las
   columnas, lo contrario de lo que este archivo hace.
+- **Un campo que un rol no puede ver** (el costo y el margen de un repuesto,
+  que el mecánico no ve) es opcional en la misma entidad, con
+  `@ApiPropertyOptional` y «Solo para ADMIN» en su descripción, y el
+  constructor lo copia solo si el controller se lo pide
+  (`new Product(product, { includeCosts })`, calculado con `@CurrentUser()`).
+  Para el otro rol la clave no sale en el JSON. Una sola entidad y no dos: es
+  el mismo recurso en el mismo endpoint. Ejemplo real:
+  `modules/inventory/products/`.
 - **Los `Decimal` salen como cadena, con `.toFixed(2)`.** Prisma los devuelve
   como objetos de decimal.js para no perder céntimos; serializados sin más,
   `180.50` viaja como `"180.5"` y el céntimo se pierde al cuadrar totales.
@@ -493,6 +507,11 @@ con los errores de Prisma.
   `where` en una `$transaction`, `pageWindow()` para `skip`/`take`, y un
   desempate por la clave primaria en `orderBy` para que las páginas no se
   pisen. La paginación sale en `meta`.
+- **Un filtro que compara dos columnas de la misma fila** (stock bajo:
+  `stock <= minStock`) usa la referencia a la columna,
+  `this.prisma.product.fields.minStock`, como valor del filtro. La función que
+  arma el `where` la recibe por parámetro (`productsWhere(query, minStock)`)
+  para probarla sin base.
 - **El ejemplo real** es `modules/customer/customers/`.
 
 ### El service consulta directo

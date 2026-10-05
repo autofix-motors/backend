@@ -51,6 +51,21 @@ Reglas:
 
 ## 2026-10-04
 
+### Repuestos e insumos — Eduardo Huarcaya · 20:05
+commits [`a3a4558`](../../commit/a3a4558) · [`2fda56f`](../../commit/2fda56f)
+
+Primer módulo del grupo `inventory` (`/products`): listado con búsqueda por
+código, nombre y marca, filtros por tipo, estado y stock bajo, y detalle para
+`ADMIN` y `MECHANIC` (el mecánico sin costo ni margen); alta, edición y borrado
+real (409 si tiene movimientos u órdenes) solo para `ADMIN`. El stock no se
+edita: nace en 0 y lo moverán los movimientos. Nuevo `IsQuantity`
+(`core/validation/quantity.ts`); las reglas de `Decimal(10, 2)` quedan en
+`decimal.ts`.
+
+> **IMPORTANTE** — Sin migración. La respuesta de `Product` cambia según el
+> rol: `cost` y `margin` no vienen para `MECHANIC`. No se probó contra la base:
+> Postgres local no acepta conexiones.
+
 ### Catálogo de servicios — Eduardo Huarcaya · 19:50
 commits [`2cf1d2e`](../../commit/2cf1d2e)
 
