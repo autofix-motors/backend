@@ -414,7 +414,10 @@ export class CreateCustomerDto {
   class-validator da en inglés, el de la propiedad de más, lo traduce el
   `exceptionFactory` del pipe.
 - **El DTO de edición es `PartialType` de `@nestjs/swagger`**, no el de
-  `@nestjs/mapped-types`, para conservar la documentación.
+  `@nestjs/mapped-types`, para conservar la documentación, y **siempre con
+  `{ skipNullProperties: false }`**: con el default, `{ "name": null }` salta la
+  validación y la base lo rechaza con un 500. Los opcionales siguen aceptando
+  `null` por su propio `@IsOptional`.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
