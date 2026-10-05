@@ -9,6 +9,7 @@ import { AccessGuard } from './core/guards/access.guard.js';
 import { RolesGuard } from './core/guards/roles.guard.js';
 import { CoreModule } from './modules/core/core.module.js';
 import { CustomerModule } from './modules/customer/customer.module.js';
+import { InventoryModule } from './modules/inventory/inventory.module.js';
 import { WorkshopModule } from './modules/workshop/workshop.module.js';
 
 @Module({
@@ -23,6 +24,7 @@ import { WorkshopModule } from './modules/workshop/workshop.module.js';
     CoreModule,
     CustomerModule,
     WorkshopModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [
