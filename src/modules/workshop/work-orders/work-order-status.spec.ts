@@ -26,6 +26,7 @@ const ADMIN_ALLOWED = new Set([
   'WAITING_PARTS→CANCELLED',
   'READY→DELIVERED',
   'READY→IN_PROGRESS',
+  'READY→CANCELLED',
 ]);
 
 /** El mecánico: lo mismo, salvo entregar y cancelar. */

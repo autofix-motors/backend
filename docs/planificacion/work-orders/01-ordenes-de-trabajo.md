@@ -31,7 +31,7 @@ cambia el schema ni tiene migración.
 | Las transiciones son una **tabla pura** (`MANUAL_TRANSITIONS` en `work-order-status.ts`) con `canTransition(from, to, role)`, probada par por par para los dos roles. Fuera de la tabla, 409 «Una orden en «X» no puede pasar a «Y»»; en la tabla pero no para el rol, 403 | Una sola fuente para la API; el frontend tiene una copia para dibujar los botones, con el mismo test |
 | El mecánico lleva su orden **a** `DIAGNOSIS`, `IN_PROGRESS`, `WAITING_PARTS` o `READY` (desde el estado que la tabla permita, también desde `RECEIVED`); `DELIVERED` y `CANCELLED` solo `ADMIN` | Es el trabajo del taller; entregar y cancelar tocan al cliente y a la caja |
 | **`WAITING_APPROVAL` no se pide a mano**: desde `DIAGNOSIS` no se ofrece, y desde `WAITING_APPROVAL` solo se cancela. El módulo 9 lo extiende así: enviar un presupuesto lleva DIAGNOSIS → WAITING_APPROVAL y registrar la decisión lleva a IN_PROGRESS (aprobado) o DIAGNOSIS (rechazado), **desde el service de presupuestos**, en su transacción, con su regla y creando el mismo `WorkOrderEvent`. La tabla queda para los botones; si alguna de esas salidas se quiere también a mano, se agrega a la tabla (y a la copia del frontend) con su test | Así lo dice el alcance: la aprobación la registra el administrador con la respuesta del cliente, no un botón de estado |
-| `READY → IN_PROGRESS` es el **retrabajo** | El cliente encontró algo al recoger |
+| `READY → IN_PROGRESS` es el **retrabajo**. `READY → CANCELLED` también vale (corregido en el módulo 8: la primera versión de la tabla no lo permitía) | El cliente encontró algo al recoger. El alcance aprobado dice «CANCELLED desde cualquier estado antes de DELIVERED», y listo para recoger todavía no es entregado |
 | Cambiar de estado escribe con el estado leído en el `where` (`{ workOrderId, status: from }`); si otro lo cambió entre medio, 409 «La orden cambió de estado mientras tanto: vuelve a cargarla» | Dos personas moviendo la misma orden no se pisan en silencio |
 | Cancelar exige la nota (400 «Indica el motivo de la cancelación en la nota») y la guarda también en `cancelReason`, con `cancelledAt`; entregar llena `deliveredAt`. `isPublic` es `true` por defecto en los cambios de estado | Reglas de `01-modelo-de-datos.md`. El cambio de estado es lo que el cliente sigue |
 | Una nota es un evento sin estado; `isPublic` **obligatorio** en la nota. Se puede anotar también en una orden cerrada | Que el cliente la vea es una decisión, no un valor por omisión. Después de entregar todavía pasan cosas (una llamada, una garantía) |
@@ -49,9 +49,6 @@ cambia el schema ni tiene migración.
   `RECEIVED`.** La regla dice que se mueve «entre DIAGNOSIS, IN_PROGRESS,
   WAITING_PARTS y READY»; se interpretó como los estados a los que puede
   llevar la orden.
-- **Desde `READY` no se cancela** (la tabla pedida solo da DELIVERED e
-  IN_PROGRESS), aunque el alcance dice «CANCELLED desde cualquier estado antes
-  de DELIVERED». Si se quiere, es una línea en la tabla y en su copia.
 - **Asignar a cualquier usuario activo**, no solo a mecánicos.
 - **Notas en órdenes cerradas** sí se permiten.
 - **Una orden abierta por vehículo**, sin índice en la base.

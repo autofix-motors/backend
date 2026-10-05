@@ -36,7 +36,8 @@ export const MANUAL_TRANSITIONS: Readonly<
   [IN_PROGRESS]: [WAITING_PARTS, READY, CANCELLED],
   [WAITING_PARTS]: [IN_PROGRESS, CANCELLED],
   // Volver a reparación es el retrabajo: el cliente encontró algo al recoger.
-  [READY]: [DELIVERED, IN_PROGRESS],
+  // Cancelar sigue valiendo: el alcance permite cancelar antes de entregar.
+  [READY]: [DELIVERED, IN_PROGRESS, CANCELLED],
   [DELIVERED]: [],
   [CANCELLED]: [],
 };

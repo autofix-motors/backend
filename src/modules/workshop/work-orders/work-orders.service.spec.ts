@@ -546,12 +546,14 @@ describe('WorkOrdersService', () => {
     });
 
     it('409 si la tabla no lo permite desde el estado actual', async () => {
-      prisma.workOrder.findUnique.mockResolvedValue(order({ status: 'READY' }));
+      prisma.workOrder.findUnique.mockResolvedValue(
+        order({ status: 'WAITING_PARTS' }),
+      );
       await expect(
-        service.changeStatus('wo-1', { status: 'CANCELLED', note: 'x' }, ADMIN),
+        service.changeStatus('wo-1', { status: 'READY' }, ADMIN),
       ).rejects.toThrow(
         new ConflictException(
-          'Una orden en «Listo para recoger» no puede pasar a «Cancelado»',
+          'Una orden en «Esperando repuestos» no puede pasar a «Listo para recoger»',
         ),
       );
       prisma.workOrder.findUnique.mockResolvedValue(
@@ -579,6 +581,19 @@ describe('WorkOrdersService', () => {
         service.changeStatus('wo-1', { status: 'DIAGNOSIS' }, OTHER_MECHANIC),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.workOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('una orden lista para recoger todavía se puede cancelar', async () => {
+      prisma.workOrder.findUnique.mockResolvedValue(order({ status: 'READY' }));
+      await service.changeStatus(
+        'wo-1',
+        { status: 'CANCELLED', note: 'El cliente no recogerá el vehículo' },
+        ADMIN,
+      );
+      expect(prisma.workOrder.update.mock.calls[0][0]).toMatchObject({
+        where: { workOrderId: 'wo-1', status: 'READY' },
+        data: { status: 'CANCELLED', cancelledAt: NOW },
+      });
     });
 
     it('cancelar exige el motivo y lo guarda con la fecha', async () => {
