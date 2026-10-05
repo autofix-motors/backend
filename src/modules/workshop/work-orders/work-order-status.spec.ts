@@ -1,5 +1,6 @@
 import { WorkOrderStatus } from '../../../generated/prisma/enums.js';
 import {
+  canChangeItems,
   canTransition,
   isClosed,
   isOverdue,
@@ -75,6 +76,17 @@ describe('canTransition', () => {
 describe('isClosed', () => {
   it('solo entregada y cancelada están cerradas', () => {
     expect(STATUSES.filter(isClosed)).toEqual(['DELIVERED', 'CANCELLED']);
+  });
+});
+
+describe('canChangeItems', () => {
+  it('los ítems se cambian mientras se diagnostica y se repara', () => {
+    expect(STATUSES.filter(canChangeItems)).toEqual([
+      'RECEIVED',
+      'DIAGNOSIS',
+      'IN_PROGRESS',
+      'WAITING_PARTS',
+    ]);
   });
 });
 

@@ -37,13 +37,21 @@ const INVERTED_RANGE = 'La fecha desde no puede ser posterior a la fecha hasta';
 /**
  * Un movimiento por registrar: el cambio de stock que aplica al producto, más
  * quién lo registra y su nota. El consumo en una orden lleva el ítem que lo
- * generó (obligatorio en WORK_ORDER: un ítem mueve stock una sola vez).
+ * generó (un ítem mueve stock una sola vez). La devolución de un ítem quitado
+ * de la orden también es WORK_ORDER —revierte un consumo, no es un ajuste de
+ * inventario—, pero va sin ítem (ya no existe) y con la nota obligatoria, que
+ * dice de qué orden vuelve.
  */
 export type NewStockMovement = StockChange & {
   createdById: string;
   note?: string | null;
 } & (
     | { type: typeof StockMovementType.WORK_ORDER; workOrderItemId: string }
+    | {
+        type: typeof StockMovementType.WORK_ORDER;
+        workOrderItemId: null;
+        note: string;
+      }
     | {
         type:
           | typeof StockMovementType.PURCHASE
@@ -128,7 +136,8 @@ export class StockMovementsService {
    * Registra un movimiento y mueve el stock del producto en la transacción
    * `tx` del llamador: o se guardan los dos o ninguno. Las compras y los
    * ajustes abren la suya; el consumo en una orden la comparte con el ítem
-   * que lo genera, para que el ítem no quede sin su salida. Un movimiento no
+   * que lo genera, para que el ítem no quede sin su salida (y la devolución,
+   * con el borrado del ítem, para que no vuelva dos veces). Un movimiento no
    * se edita ni se borra: se corrige con un ajuste.
    *
    * El costo unitario es el del producto después de aplicar el cambio: en una

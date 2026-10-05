@@ -270,4 +270,33 @@ describe('StockMovementsService', () => {
       include: WITH_RELATIONS,
     });
   });
+
+  it('la devolución de un ítem quitado entra como WORK_ORDER, sin ítem y con su nota', async () => {
+    products.applyStockChange.mockResolvedValue({
+      cost: new Prisma.Decimal('18'),
+    });
+    tx.stockMovement.create.mockResolvedValue({});
+
+    await service.record(tx as unknown as Prisma.TransactionClient, {
+      type: 'WORK_ORDER',
+      productId: 'p1',
+      quantity: '2',
+      workOrderItemId: null,
+      note: 'Devolución: ítem quitado de OT-000123',
+      createdById: 'u2',
+    });
+
+    // WORK_ORDER: `applyStockChange` no exige el producto activo, así que un
+    // repuesto desactivado después de usarse se puede devolver.
+    expect(products.applyStockChange).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ type: 'WORK_ORDER', quantity: '2' }),
+    );
+    expect(tx.stockMovement.create.mock.calls[0][0].data).toMatchObject({
+      type: 'WORK_ORDER',
+      quantity: '2',
+      workOrderItemId: null,
+      note: 'Devolución: ítem quitado de OT-000123',
+    });
+  });
 });

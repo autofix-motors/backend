@@ -52,15 +52,26 @@ const WITH_RELATIONS = {
   },
   customer: { select: { customerId: true, name: true, phone: true } },
   mechanic: USER_SUMMARY,
+  // Para el total del listado alcanza con el tipo, la cantidad y el precio:
+  // una consulta más por página (Prisma trae los ítems de todas sus órdenes
+  // juntos), sin guardar el total en la orden.
+  items: { select: { type: true, quantity: true, unitPrice: true } },
 } satisfies Prisma.WorkOrderInclude;
 
-const WITH_TIMELINE = {
+/** La orden completa: lo que responde el detalle y cada cambio. */
+export const WITH_TIMELINE = {
   ...WITH_RELATIONS,
   createdBy: USER_SUMMARY,
   events: {
     include: { createdBy: USER_SUMMARY },
     // Dos eventos del mismo instante salen siempre en el mismo orden.
     orderBy: [{ createdAt: 'asc' }, { workOrderEventId: 'asc' }],
+  },
+  // La unidad del repuesto se lee por la relación del propio ítem, como el
+  // vehículo de la orden: dice en qué se mide la cantidad.
+  items: {
+    include: { product: { select: { unit: true } } },
+    orderBy: [{ createdAt: 'asc' }, { workOrderItemId: 'asc' }],
   },
 } satisfies Prisma.WorkOrderInclude;
 

@@ -62,6 +62,23 @@ export function isClosed(status: WorkOrderStatus): status is ClosedStatus {
   return (CLOSED_STATUSES as readonly WorkOrderStatus[]).includes(status);
 }
 
+/**
+ * Mientras se pueden agregar, cambiar o quitar servicios y repuestos: mientras
+ * se diagnostica y se repara. Esperando aprobación no, porque el cliente
+ * evalúa un presupuesto armado con esos ítems; listo o cerrada, el trabajo ya
+ * terminó y lo que se cobra no se mueve.
+ */
+export const ITEM_STATUSES: readonly WorkOrderStatus[] = [
+  RECEIVED,
+  DIAGNOSIS,
+  IN_PROGRESS,
+  WAITING_PARTS,
+];
+
+export function canChangeItems(status: WorkOrderStatus): boolean {
+  return ITEM_STATUSES.includes(status);
+}
+
 /** Si `role` puede llevar a mano una orden de `from` a `to`. */
 export function canTransition(
   from: WorkOrderStatus,

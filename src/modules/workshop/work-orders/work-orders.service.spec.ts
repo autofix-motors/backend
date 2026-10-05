@@ -236,6 +236,13 @@ describe('WorkOrdersService', () => {
       });
     });
 
+    it('de los ítems trae solo lo que suma el total, en la misma consulta', async () => {
+      await service.findAll(query, ADMIN);
+      expect(prisma.workOrder.findMany.mock.calls[0][0].include.items).toEqual({
+        select: { type: true, quantity: true, unitPrice: true },
+      });
+    });
+
     it('el mecánico solo ve las suyas, pida lo que pida', async () => {
       await service.findAll({ ...query, mechanicId: 'mech-9' }, MECHANIC);
       await service.findAll(query, MECHANIC);

@@ -71,8 +71,9 @@ model StockMovement {
   /// en las salidas es el costo con que salió.
   unitCost        Decimal?          @map("unit_cost") @db.Decimal(10, 2)
   /// La salida que generó un repuesto agregado a una orden. Único: un ítem
-  /// mueve stock una sola vez. Obligatorio si `type` es WORK_ORDER (lo valida
-  /// el service).
+  /// mueve stock una sola vez. Obligatorio en la salida WORK_ORDER (lo valida
+  /// el service); la devolución de un ítem quitado es WORK_ORDER sin ítem, con
+  /// la orden en la nota.
   workOrderItemId String?           @unique @map("work_order_item_id") @db.Uuid
   note            String?
   createdById     String            @map("created_by_id") @db.Uuid

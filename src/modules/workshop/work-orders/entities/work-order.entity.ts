@@ -4,6 +4,7 @@ import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
 import { fromDateColumn } from '../../../../shared/date-column.js';
 import { limaToday } from '../../../../shared/lima-dates.js';
 import { isOverdue } from '../work-order-status.js';
+import { type TotaledItem, workOrderAmounts } from '../work-order-totals.js';
 import {
   WorkOrderCustomer,
   type WorkOrderCustomerModel,
@@ -21,11 +22,13 @@ export type WorkOrderWithRelations = WorkOrderModel & {
   vehicle: WorkOrderVehicleModel;
   customer: WorkOrderCustomerModel;
   mechanic: WorkOrderUserModel | null;
+  /** Solo lo que hace falta para el total: tipo, cantidad y precio. */
+  items: TotaledItem[];
 };
 
 /**
  * Lo que sale de una orden en el listado: sus datos de ingreso, el vehículo,
- * el cliente y el mecánico resumidos, y si está vencida.
+ * el cliente y el mecánico resumidos, si está vencida y su total.
  */
 export class WorkOrder {
   constructor(order: WorkOrderWithRelations, today: string = limaToday()) {
@@ -43,6 +46,7 @@ export class WorkOrder {
     this.vehicle = new WorkOrderVehicle(order.vehicle);
     this.customer = new WorkOrderCustomer(order.customer);
     this.mechanic = order.mechanic && new WorkOrderUser(order.mechanic);
+    this.total = workOrderAmounts(order.items).total.toFixed(2);
   }
 
   @ApiProperty({ format: 'uuid' })
@@ -94,4 +98,10 @@ export class WorkOrder {
 
   @ApiProperty({ type: WorkOrderUser, nullable: true })
   mechanic: WorkOrderUser | null;
+
+  @ApiProperty({
+    example: '275.50',
+    description: 'La suma de sus servicios y repuestos, en soles',
+  })
+  total: string;
 }
