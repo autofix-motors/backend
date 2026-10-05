@@ -119,6 +119,18 @@ export class SessionsService {
     });
   }
 
+  /**
+   * Cierra todas las sesiones de un usuario: lo usa users al desactivarlo o al
+   * cambiarle la contraseña o el rol. Solo corta el refresco: el JWT de acceso
+   * que ya tiene sigue valiendo hasta que vence (ACCESS_TOKEN_MINUTES).
+   */
+  async revokeAllForUser(userId: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   private expiration(): Date {
     const days = this.config.getOrThrow<number>('REFRESH_TOKEN_DAYS');
     return new Date(Date.now() + days * 86_400_000);

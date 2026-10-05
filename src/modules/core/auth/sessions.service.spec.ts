@@ -96,3 +96,20 @@ describe('SessionsService.rotate', () => {
     expect(tx.session.create).not.toHaveBeenCalled();
   });
 });
+
+describe('SessionsService.revokeAllForUser', () => {
+  it('revoca solo las sesiones vigentes de ese usuario', async () => {
+    const prisma = { session: { updateMany: vi.fn() } };
+    const service = new SessionsService(
+      prisma as unknown as PrismaService,
+      {} as ConfigService,
+    );
+
+    await service.revokeAllForUser('u1');
+
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+});

@@ -27,5 +27,8 @@ import { SessionsService } from './sessions.service.js';
   ],
   controllers: [AuthController],
   providers: [AuthService, SessionsService],
+  // Users cierra las sesiones de un usuario al desactivarlo o cambiarle la
+  // contraseña o el rol: la tabla de sesiones es de auth (invariante 3).
+  exports: [SessionsService],
 })
 export class AuthModule {}
