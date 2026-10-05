@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma, type Product } from '../../../generated/prisma/client.js';
+import { StockMovementType } from '../../../generated/prisma/enums.js';
 import {
   pageWindow,
   paginationMeta,
@@ -16,6 +18,25 @@ import type { UpdateProductDto } from './dto/update-product.dto.js';
 
 const NOT_FOUND = 'No se encontró el producto';
 const DUPLICATE = 'Ya existe un producto con ese código';
+const INACTIVE =
+  'El producto está inactivo: actívalo antes de registrarle compras o ajustes';
+
+/**
+ * Lo que un movimiento de stock le hace al producto. `quantity` va con signo,
+ * en la unidad del producto: positiva entra, negativa sale. Una compra trae su
+ * costo unitario, que pasa a ser el costo del producto.
+ */
+export type StockChange = {
+  productId: string;
+  quantity: Prisma.Decimal | string;
+} & (
+  | { type: typeof StockMovementType.PURCHASE; unitCost: string }
+  | {
+      type:
+        | typeof StockMovementType.ADJUSTMENT
+        | typeof StockMovementType.WORK_ORDER;
+    }
+);
 
 @Injectable()
 export class ProductsService {
@@ -61,6 +82,63 @@ export class ProductsService {
     } catch (error) {
       throw translateDuplicate(error);
     }
+  }
+
+  /**
+   * Aplica al producto el cambio de stock de un movimiento, dentro de la
+   * transacción `tx` en la que el llamador crea ese movimiento: el stock es la
+   * suma del kardex (redundancia deliberada) y los dos se guardan juntos o no
+   * se guarda ninguno. Es la única escritura del stock: la tabla de productos
+   * es de este módulo, así que los movimientos (y el consumo de las órdenes)
+   * pasan por aquí en vez de escribirla por su cuenta.
+   *
+   * - **El stock nunca queda negativo.** Una salida se aplica con un solo
+   *   `UPDATE … WHERE stock >= salida`: comparar y descontar en la misma
+   *   sentencia hace que dos salidas a la vez no puedan llevarse lo mismo
+   *   (Postgres vuelve a evaluar el `WHERE` de la segunda cuando la primera
+   *   libera la fila). Si no alcanza, 409 con lo que queda.
+   * - **Compras y ajustes exigen el producto activo** (400 si no). El consumo
+   *   en una orden no: si el producto se desactivó con la orden ya armada, su
+   *   salida —o su devolución al quitar el ítem— tiene que poder registrarse.
+   * - **Una compra actualiza el costo** del producto al de la compra.
+   *
+   * Devuelve el producto ya actualizado, con el stock y el costo nuevos.
+   */
+  async applyStockChange(
+    tx: Prisma.TransactionClient,
+    change: StockChange,
+  ): Promise<Product> {
+    const { productId } = change;
+    const delta = new Prisma.Decimal(change.quantity);
+    const requiresActive = change.type !== StockMovementType.WORK_ORDER;
+
+    const { count } = await tx.product.updateMany({
+      where: {
+        productId,
+        ...(requiresActive && { isActive: true }),
+        ...(delta.isNegative() && { stock: { gte: delta.negated() } }),
+      },
+      data: {
+        stock: { increment: delta },
+        ...(change.type === StockMovementType.PURCHASE && {
+          cost: change.unitCost,
+        }),
+      },
+    });
+
+    // Se lee después de escribir, en la misma transacción: si se aplicó, es el
+    // producto actualizado; si no, dice por qué no.
+    const product = await tx.product.findUnique({ where: { productId } });
+    if (!product) throw new NotFoundException(NOT_FOUND);
+    if (count === 0) {
+      if (requiresActive && !product.isActive) {
+        throw new BadRequestException(INACTIVE);
+      }
+      throw new ConflictException(
+        `Stock insuficiente: quedan ${product.stock.toFixed(2)} de ${product.code}`,
+      );
+    }
+    return product;
   }
 
   /**

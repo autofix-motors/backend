@@ -1,11 +1,20 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import { ProductsService, productsWhere } from './products.service.js';
+import {
+  ProductsService,
+  productsWhere,
+  type StockChange,
+} from './products.service.js';
 
 // Lo que se prueba es lo que decide: cómo se arman la búsqueda y los filtros
-// (el stock bajo compara dos columnas), el código repetido y que un producto
-// con historial no se borre.
+// (el stock bajo compara dos columnas), el código repetido, que un producto
+// con historial no se borre y cómo un movimiento cambia el stock sin dejarlo
+// negativo.
 
 // En los tests basta un marcador: lo que importa es que el filtro use la
 // referencia a la columna y no un valor.
@@ -174,5 +183,136 @@ describe('ProductsService', () => {
   it('responde 404 al borrar un producto que no existe', async () => {
     prisma.product.findUnique.mockResolvedValue(null);
     await expect(service.remove('p1')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('ProductsService.applyStockChange', () => {
+  // La transacción del llamador: el método solo usa sus consultas de producto.
+  const tx = {
+    product: { updateMany: vi.fn(), findUnique: vi.fn() },
+  };
+  const service = new ProductsService({} as PrismaService);
+  const apply = (change: StockChange) =>
+    service.applyStockChange(tx as unknown as Prisma.TransactionClient, change);
+  const product = (overrides: Record<string, unknown> = {}) => ({
+    productId: 'p1',
+    code: 'FA-001',
+    stock: new Prisma.Decimal('3'),
+    cost: new Prisma.Decimal('12.5'),
+    isActive: true,
+    ...overrides,
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('una compra suma al stock de forma atómica y actualiza el costo', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+    tx.product.findUnique.mockResolvedValue(product());
+
+    await apply({
+      type: 'PURCHASE',
+      productId: 'p1',
+      quantity: '12',
+      unitCost: '13.80',
+    });
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { productId: 'p1', isActive: true },
+      data: {
+        stock: { increment: new Prisma.Decimal('12') },
+        cost: '13.80',
+      },
+    });
+  });
+
+  it('un ajuste que resta solo se aplica si alcanza el stock, en la misma sentencia', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+    tx.product.findUnique.mockResolvedValue(product());
+
+    await apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '-2.5' });
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: {
+        productId: 'p1',
+        isActive: true,
+        stock: { gte: new Prisma.Decimal('2.5') },
+      },
+      // Sin costo: solo la compra lo cambia.
+      data: { stock: { increment: new Prisma.Decimal('-2.5') } },
+    });
+  });
+
+  it('devuelve el producto actualizado, leído en la misma transacción', async () => {
+    const updated = product({ stock: new Prisma.Decimal('15') });
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+    tx.product.findUnique.mockResolvedValue(updated);
+
+    await expect(
+      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '12' }),
+    ).resolves.toBe(updated);
+    expect(tx.product.findUnique).toHaveBeenCalledWith({
+      where: { productId: 'p1' },
+    });
+  });
+
+  it('si no alcanza, responde 409 con lo que queda y no deja el stock negativo', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 0 });
+    tx.product.findUnique.mockResolvedValue(product());
+
+    await expect(
+      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '-5' }),
+    ).rejects.toThrow(
+      new ConflictException('Stock insuficiente: quedan 3.00 de FA-001'),
+    );
+  });
+
+  it('responde 404 si el producto no existe', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 0 });
+    tx.product.findUnique.mockResolvedValue(null);
+
+    await expect(
+      apply({
+        type: 'PURCHASE',
+        productId: 'p1',
+        quantity: '1',
+        unitCost: '1',
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('no registra compras ni ajustes de un producto inactivo', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 0 });
+    tx.product.findUnique.mockResolvedValue(product({ isActive: false }));
+
+    await expect(
+      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '1' }),
+    ).rejects.toThrow(
+      new BadRequestException(
+        'El producto está inactivo: actívalo antes de registrarle compras o ajustes',
+      ),
+    );
+  });
+
+  it('el consumo en una orden no exige el producto activo', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 1 });
+    tx.product.findUnique.mockResolvedValue(product({ isActive: false }));
+
+    await apply({ type: 'WORK_ORDER', productId: 'p1', quantity: '-1' });
+
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { productId: 'p1', stock: { gte: new Prisma.Decimal('1') } },
+      data: { stock: { increment: new Prisma.Decimal('-1') } },
+    });
+  });
+
+  it('un consumo sin stock suficiente también es 409, aunque el producto esté inactivo', async () => {
+    tx.product.updateMany.mockResolvedValue({ count: 0 });
+    tx.product.findUnique.mockResolvedValue(
+      product({ isActive: false, stock: new Prisma.Decimal('0') }),
+    );
+
+    await expect(
+      apply({ type: 'WORK_ORDER', productId: 'p1', quantity: '-1' }),
+    ).rejects.toThrow('Stock insuficiente: quedan 0.00 de FA-001');
   });
 });
