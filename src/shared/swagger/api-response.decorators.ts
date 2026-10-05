@@ -12,11 +12,21 @@ interface Options {
 // combinando el envoltorio con el modelo de `data` (allOf). Sin esto,
 // `api.gen.ts` del frontend tiparía `data` como desconocido.
 
-/** Respuesta con un solo resultado en `data`, o `null` si `model` es null. */
-export function ApiBaseResponse(model: Type | null, options: Options = {}) {
-  const data = model
-    ? { $ref: getSchemaPath(model) }
-    : { type: 'object', nullable: true, example: null };
+/**
+ * Respuesta con un resultado en `data`, o `null` si `model` es null. Con
+ * `isArray`, `data` es una lista sin paginar (para listas cortas, como las
+ * opciones de un filtro).
+ */
+export function ApiBaseResponse(
+  model: Type | null,
+  options: Options & { isArray?: boolean } = {},
+) {
+  const ref = model && { $ref: getSchemaPath(model) };
+  const data = !ref
+    ? { type: 'object', nullable: true, example: null }
+    : options.isArray
+      ? { type: 'array', items: ref }
+      : ref;
   return applyDecorators(
     ApiExtraModels(BaseResponseDto, ...(model ? [model] : [])),
     ApiResponse({
