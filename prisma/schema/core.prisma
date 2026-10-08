@@ -1,11 +1,13 @@
 /// Quien entra al sistema: el personal del taller. Los clientes del taller no
 /// inician sesión, así que no son usuarios.
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @id @default(uuid()) @map("user_id") @db.Uuid
   /// Se guarda siempre en minúsculas: es con lo que se inicia sesión, y
   /// «Juan@Taller.pe» y «juan@taller.pe» son la misma persona.
   email        String    @unique
   name         String
+  /// Para ubicar al personal; no se usa para iniciar sesión.
+  phone        String?   @db.VarChar(20)
   /// Un usuario tiene un solo rol. El taller solo necesita dos, así que lo que
   /// puede hacer cada uno se decide por rol, sin tabla de permisos.
   role         UserRole  @default(MECHANIC)
@@ -21,8 +23,21 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at")
 
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions Session[]
+
+  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Por eso un
+  // usuario se da de baja y no se borra: estas filas necesitan su autor.
+  assignedWorkOrders WorkOrder[]      @relation("WorkOrderMechanic")
+  createdWorkOrders  WorkOrder[]      @relation("WorkOrderCreatedBy")
+  workOrderEvents    WorkOrderEvent[]
+  sentQuotes         Quote[]          @relation("QuoteSentBy")
+  decidedQuotes      Quote[]          @relation("QuoteDecidedBy")
+  stockMovements     StockMovement[]
+  assignedTools      Tool[]
+  receivedPayments   Payment[]        @relation("PaymentReceivedBy")
+  voidedPayments     Payment[]        @relation("PaymentVoidedBy")
 
   @@map("core_user")
 }
@@ -44,7 +59,7 @@ enum UserRole {
 /// Cada refresco revoca la fila usada y crea otra en la misma familia. Si llega
 /// un token ya revocado, alguien lo copió: se revoca la familia entera.
 model Session {
-  id           String    @id @default(uuid()) @db.Uuid
+  sessionId    String    @id @default(uuid()) @map("session_id") @db.Uuid
   userId       String    @map("user_id") @db.Uuid
   /// SHA-256 del token de refresco, en hexadecimal. El token nunca se guarda:
   /// si la base se filtra, estos hashes no sirven para entrar.
@@ -66,7 +81,7 @@ model Session {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Cascade: las sesiones de un usuario no tienen sentido sin él.
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@index([userId])
   @@index([familyId])

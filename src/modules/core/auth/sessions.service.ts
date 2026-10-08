@@ -75,7 +75,7 @@ export class SessionsService {
       // simultáneos con el mismo token no pasen los dos: el segundo no
       // actualiza nada y se trata como reuso.
       const revoked = await tx.session.updateMany({
-        where: { id: session.id, revokedAt: null },
+        where: { sessionId: session.sessionId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
       if (revoked.count === 0) {
@@ -92,8 +92,8 @@ export class SessionsService {
         },
       });
       await tx.session.update({
-        where: { id: session.id },
-        data: { replacedById: created.id },
+        where: { sessionId: session.sessionId },
+        data: { replacedById: created.sessionId },
       });
     });
 

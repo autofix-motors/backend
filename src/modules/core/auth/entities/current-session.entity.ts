@@ -9,14 +9,14 @@ import { UserRole } from '../../../../generated/prisma/enums.js';
  */
 export class CurrentSession {
   constructor(user: User) {
-    this.id = user.id;
+    this.userId = user.userId;
     this.name = user.name;
     this.email = user.email;
     this.role = user.role;
   }
 
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  userId: string;
 
   @ApiProperty({ example: 'Administrador' })
   name: string;
