@@ -49,6 +49,27 @@ Reglas:
 
 ---
 
+## 2026-10-16
+
+### Login compartido, acceso de clientes y contraseñas temporales — Eduardo Huarcaya · 23:40
+commits [`0f18b8d`](../../commit/0f18b8d)
+
+El cliente inicia sesión en su portal (`POST /auth/customer-login`) con su
+número de documento o correo, y el personal (`POST /auth/login`) con su DNI o
+correo. El acceso del cliente lo habilita, restablece o quita el
+administrador (`/customer-accounts`). Las contraseñas las genera el sistema
+(temporales, vencen) y se cambian en el primer ingreso (`PUT /auth/password`).
+El `RolesGuard` niega al cliente cualquier endpoint que no sea suyo. Plan en
+`docs/planificacion/auth/01-login-compartido-y-contrasenas.md`.
+
+> **IMPORTANTE** — Migración `20261017041056_acceso_al_portal` (solo agrega;
+> pasa los correos de clientes a minúsculas). Variable nueva opcional
+> `TEMPORARY_PASSWORD_DAYS` (7 por omisión). Cambia el contrato: el login
+> recibe `identifier` en vez de `email`; `POST /users` ya no recibe
+> `password` y exige `documentNumber`; `PUT /users/:id/password` se reemplaza
+> por `POST /users/:id/temporary-password`; `CurrentSession` cambia de forma.
+> El frontend tiene que regenerar sus tipos.
+
 ## 2026-10-04
 
 ### Presupuestos de una orden — Eduardo Huarcaya · 22:32
