@@ -51,6 +51,19 @@ Reglas:
 
 ## 2026-10-16
 
+### Catálogo base del taller en el seed — Eduardo Huarcaya · 23:55
+commits [`7cb7771`](../../commit/7cb7771)
+
+`pnpm db:seed` siembra, además del administrador, 22 servicios con su mano de
+obra, 26 repuestos e insumos con su stock inicial (registrado como compra en
+el kardex, a nombre del administrador) y 11 herramientas. Los precios son una
+estimación del mercado de Lima, para que el taller los ajuste. Volver a
+sembrar no duplica stock ni cambia lo que ya existe.
+
+> **IMPORTANTE** — Se vació la base local de desarrollo (`TRUNCATE` de todas
+> las tablas salvo `_prisma_migrations`) y se volvió a sembrar: queda solo
+> `admin@autofix.local` con la contraseña de `ADMIN_PASSWORD`.
+
 ### Login compartido, acceso de clientes y contraseñas temporales — Eduardo Huarcaya · 23:40
 commits [`0f18b8d`](../../commit/0f18b8d)
 
