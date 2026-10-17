@@ -51,6 +51,21 @@ Reglas:
 
 ## 2026-10-04
 
+### Presupuestos de una orden — Eduardo Huarcaya · 22:32
+commits [`35f6e2c`](../../commit/35f6e2c)
+
+Enviar un presupuesto (`POST /work-orders/:workOrderId/quotes`) congela los
+ítems y el total de la orden en una versión nueva y la lleva a «Esperando
+aprobación»; registrar la respuesta del cliente (`POST
+…/quotes/:quoteId/decision`: aprobado o rechazado, canal y nota) la lleva a
+reparación o de vuelta a diagnóstico. Solo `ADMIN`; el mecánico asignado los
+ve en el detalle. Plan en `docs/planificacion/work-orders/03-presupuestos.md`.
+
+> **IMPORTANTE** — Sin migración. Cambio de flujo: «Esperando aprobación» ya
+> no se alcanza a mano, solo enviando un presupuesto (`SYSTEM_TRANSITIONS`), y
+> desde ahí a mano solo se cancela. Cambia el contrato: `WorkOrderDetail` suma
+> `quotes`; el frontend tiene que regenerar sus tipos.
+
 ### Servicios y repuestos de una orden — Eduardo Huarcaya · 22:25
 commits [`746d8e8`](../../commit/746d8e8) · [`2ba1b34`](../../commit/2ba1b34)
 

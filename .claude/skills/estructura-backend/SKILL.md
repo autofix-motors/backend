@@ -772,8 +772,15 @@ La orden de trabajo es el ejemplo real (`modules/workshop/work-orders/`):
   `canTransition(from, to, role)` en `work-order-status.ts`), probada par por
   par para cada rol. Fuera de la tabla, 409; en la tabla pero no para el rol,
   403. Un estado al que se llega por otro camino (el presupuesto lleva a
-  `WAITING_APPROVAL`) no va en la tabla de los botones: lo aplica el service
-  de ese otro módulo, con su regla, creando el mismo evento.
+  `WAITING_APPROVAL`) no va en la tabla de los botones: va en
+  `SYSTEM_TRANSITIONS` del mismo archivo, con `canApplySystemTransition`, y
+  lo aplica el service que lo causa (`WorkOrderQuotesService`), con su regla,
+  creando el mismo evento. El frontend copia solo la tabla de los botones.
+- **Una foto versionada** (el presupuesto) copia lo que se congela —tipo,
+  descripción, cantidad, precio, sin costo— a su propia tabla, sin apuntar al
+  registro vivo, y numera la versión dentro de su padre (la última + 1). Se
+  escribe en la misma transacción que el cambio de estado, con el estado
+  **primero**: toma la fila del padre y lo que se lee después ya no cambia.
 - **El cambio y su evento se escriben juntos**, anidando el evento en la misma
   escritura (`update({ data: { status, events: { create: … } } })`): Prisma
   los guarda en una transacción, sin `$transaction` explícita.
