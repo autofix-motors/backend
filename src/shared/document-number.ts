@@ -1,4 +1,4 @@
-import { DocumentType } from '../../../generated/prisma/enums.js';
+import { DocumentType } from '../generated/prisma/enums.js';
 
 /**
  * Deja el número como se guarda: en mayúsculas y sin espacios, guiones ni

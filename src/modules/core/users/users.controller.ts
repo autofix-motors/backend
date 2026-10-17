@@ -3,12 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -27,10 +27,11 @@ import {
   ApiBaseResponse,
   ApiPaginatedResponse,
 } from '../../../shared/swagger/api-response.decorators.js';
-import { ChangeUserPasswordDto } from './dto/change-user-password.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { ListUsersQueryDto } from './dto/list-users-query.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { IssuedUser } from './entities/issued-user.entity.js';
+import { TemporaryPassword } from './entities/temporary-password.entity.js';
 import { User } from './entities/user.entity.js';
 import { UsersService } from './users.service.js';
 
@@ -68,12 +69,18 @@ export class UsersController {
   }
 
   @Post()
-  @ApiBaseResponse(User, { status: HttpStatus.CREATED })
-  @ApiConflictResponse({ description: 'Ya existe un usuario con ese correo' })
-  async create(@Body() dto: CreateUserDto): Promise<BaseResponseDto<User>> {
+  // La contraseña temporal viaja una sola vez: que nadie en el camino la guarde.
+  @Header('Cache-Control', 'no-store')
+  @ApiBaseResponse(IssuedUser, { status: HttpStatus.CREATED })
+  @ApiConflictResponse({
+    description: 'Ya existe un usuario con ese correo o DNI',
+  })
+  async create(
+    @Body() dto: CreateUserDto,
+  ): Promise<BaseResponseDto<IssuedUser>> {
     return BaseResponseDto.success(
-      new User(await this.users.create(dto)),
-      'Usuario registrado',
+      new IssuedUser(await this.users.create(dto)),
+      'Usuario registrado: comparte con él su contraseña temporal',
       HttpStatus.CREATED,
     );
   }
@@ -86,7 +93,7 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'No se encontró el usuario' })
   @ApiConflictResponse({
     description:
-      'Ya existe un usuario con ese correo, o es el último administrador activo',
+      'Ya existe un usuario con ese correo o DNI, o es el último administrador activo',
   })
   async update(
     @Param('userId', ParseIdPipe) userId: string,
@@ -99,17 +106,17 @@ export class UsersController {
     );
   }
 
-  @Put(':userId/password')
-  @ApiBaseResponse(null, { description: 'Contraseña actualizada' })
+  @Post(':userId/temporary-password')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiBaseResponse(TemporaryPassword)
   @ApiNotFoundResponse({ description: 'No se encontró el usuario' })
-  async changePassword(
+  async issueTemporaryPassword(
     @Param('userId', ParseIdPipe) userId: string,
-    @Body() dto: ChangeUserPasswordDto,
-  ): Promise<BaseResponseDto<null>> {
-    await this.users.changePassword(userId, dto.password);
+  ): Promise<BaseResponseDto<TemporaryPassword>> {
     return BaseResponseDto.success(
-      null,
-      'Contraseña actualizada. Sus sesiones abiertas se cerraron',
+      new TemporaryPassword(await this.users.issueTemporaryPassword(userId)),
+      'Contraseña restablecida. Sus sesiones abiertas se cerraron',
     );
   }
 

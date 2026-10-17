@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { LoginIdentifier } from '../../../core/auth/login-identifier.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
 import {
@@ -11,7 +12,8 @@ import {
   paginationMeta,
   type Page,
 } from '../../../shared/pagination.js';
-import { documentNumberError } from './document-number.js';
+import { documentNumberError } from '../../../shared/document-number.js';
+import { SessionsService } from '../../core/sessions/sessions.service.js';
 import type { CreateCustomerDto } from './dto/create-customer.dto.js';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto.js';
 import type { UpdateCustomerDto } from './dto/update-customer.dto.js';
@@ -19,14 +21,31 @@ import type { CustomerWithCounts } from './entities/customer.entity.js';
 
 const WITH_COUNTS = {
   _count: { select: { vehicles: true } },
+  // Si tiene acceso al portal: sin el hash, que nunca sale de customer-accounts.
+  account: {
+    select: { createdAt: true, lastLoginAt: true, mustChangePassword: true },
+  },
 } satisfies Prisma.CustomerInclude;
+
+/** Cuántos candidatos se prueban como máximo en un login por correo. */
+const MAX_LOGIN_CANDIDATES = 5;
+
+/** Lo que el login del portal necesita de un cliente con acceso. */
+export interface CustomerLoginCandidate {
+  customerId: string;
+  name: string;
+  isActive: boolean;
+}
 
 const NOT_FOUND = 'No se encontró el cliente';
 const DUPLICATE = 'Ya existe un cliente con ese tipo y número de documento';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   async findAll(
     query: ListCustomersQueryDto,
@@ -79,8 +98,9 @@ export class CustomersService {
       if (message) throw new BadRequestException(message);
     }
 
+    let customer: CustomerWithCounts;
     try {
-      return await this.prisma.customer.update({
+      customer = await this.prisma.customer.update({
         where: { customerId },
         data,
         include: WITH_COUNTS,
@@ -88,6 +108,34 @@ export class CustomersService {
     } catch (error) {
       throw translateDuplicate(error);
     }
+    // Un cliente inactivo no entra a su portal: se cortan sus sesiones para
+    // que tampoco pueda renovar la que tenga abierta.
+    if (current.isActive && data.isActive === false) {
+      await this.sessions.revokeAllForCustomer(customerId);
+    }
+    return customer;
+  }
+
+  /**
+   * Los clientes con acceso al portal que coinciden con lo que se escribió al
+   * iniciar sesión. Pueden ser varios: el número de documento solo es único
+   * junto con su tipo, y el correo no es único. El login prueba la contraseña
+   * contra cada uno.
+   */
+  findLoginCandidates(
+    identifier: LoginIdentifier,
+  ): Promise<CustomerLoginCandidate[]> {
+    return this.prisma.customer.findMany({
+      where: {
+        account: { isNot: null },
+        ...(identifier.kind === 'email'
+          ? { email: identifier.value }
+          : { documentNumber: identifier.value }),
+      },
+      select: { customerId: true, name: true, isActive: true },
+      orderBy: { customerId: 'asc' },
+      take: MAX_LOGIN_CANDIDATES,
+    });
   }
 
   /**

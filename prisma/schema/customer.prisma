@@ -1,7 +1,7 @@
-/// Español: cliente. La persona o empresa que trae un vehículo al taller. No
-/// inicia sesión: sigue sus órdenes desde la página pública con el código de
-/// seguimiento. Es una entidad aparte del vehículo porque un cliente puede tener
-/// varios, y un vehículo puede cambiar de dueño.
+/// Español: cliente. La persona o empresa que trae un vehículo al taller. Si el
+/// administrador le habilita el acceso (`CustomerAccount`), sigue sus órdenes
+/// desde su portal. Es una entidad aparte del vehículo porque un cliente puede
+/// tener varios, y un vehículo puede cambiar de dueño.
 model Customer {
   customerId     String       @id @default(uuid()) @map("customer_id") @db.Uuid
   documentType   DocumentType @map("document_type")
@@ -13,6 +13,8 @@ model Customer {
   /// Obligatorio: es por donde se le avisa y se le manda el enlace de
   /// seguimiento por WhatsApp.
   phone          String       @db.VarChar(20)
+  /// En minúsculas: también sirve para iniciar sesión en el portal. No es
+  /// único (una familia puede compartir correo).
   email          String?      @db.VarChar(254)
   address        String?      @db.VarChar(250)
   notes          String?
@@ -26,6 +28,7 @@ model Customer {
 
   vehicles   Vehicle[]
   workOrders WorkOrder[]
+  account    CustomerAccount?
 
   @@unique([documentType, documentNumber])
   @@index([name])

@@ -1,9 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type { Customer as CustomerModel } from '../../../../generated/prisma/client.js';
 import { DocumentType } from '../../../../generated/prisma/enums.js';
+import { PortalAccess, type PortalAccessModel } from './portal-access.entity.js';
 
 export type CustomerWithCounts = CustomerModel & {
   _count: { vehicles: number };
+  account?: PortalAccessModel | null;
 };
 
 /** Lo que sale de un cliente por la API, con cuántos vehículos tiene. */
@@ -19,6 +21,9 @@ export class Customer {
     this.notes = customer.notes;
     this.isActive = customer.isActive;
     this.vehiclesCount = customer._count.vehicles;
+    this.portalAccess = customer.account
+      ? new PortalAccess(customer.account)
+      : null;
     this.createdAt = customer.createdAt;
     this.updatedAt = customer.updatedAt;
   }
@@ -52,6 +57,13 @@ export class Customer {
 
   @ApiProperty({ example: 2 })
   vehiclesCount: number;
+
+  @ApiProperty({
+    type: PortalAccess,
+    nullable: true,
+    description: 'Vacío si no tiene acceso al portal',
+  })
+  portalAccess: PortalAccess | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;

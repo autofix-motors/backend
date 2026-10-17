@@ -6,7 +6,8 @@ import {
 import argon2 from 'argon2';
 import type { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import type { SessionsService } from '../auth/sessions.service.js';
+import type { ConfigService } from '@nestjs/config';
+import type { SessionsService } from '../sessions/sessions.service.js';
 import {
   UsersService,
   describeHistory,
@@ -50,14 +51,24 @@ describe('usersWhere', () => {
     expect(usersWhere({})).toEqual({ role: undefined, isActive: undefined });
   });
 
-  it('busca en el nombre y el correo, y filtra por rol y estado', () => {
+  it('busca en el nombre, el correo y el DNI, y filtra por rol y estado', () => {
     const text = { contains: 'quispe', mode: 'insensitive' };
     expect(
       usersWhere({ search: 'quispe', role: 'MECHANIC', isActive: false }),
     ).toEqual({
       role: 'MECHANIC',
       isActive: false,
-      OR: [{ name: text }, { email: text }],
+      OR: [
+        { name: text },
+        { email: text },
+        { documentNumber: { contains: 'quispe' } },
+      ],
+    });
+  });
+
+  it('busca el DNI sin puntos ni espacios', () => {
+    expect(usersWhere({ search: '45.678 912' }).OR).toContainEqual({
+      documentNumber: { contains: '45678912' },
     });
   });
 });
@@ -105,10 +116,12 @@ describe('UsersService', () => {
       delete: vi.fn(),
     },
   };
-  const sessions = { revokeAllForUser: vi.fn() };
+  const sessions = { revokeAll: vi.fn() };
+  const config = { getOrThrow: vi.fn().mockReturnValue(7) };
   const service = new UsersService(
     prisma as unknown as PrismaService,
     sessions as unknown as SessionsService,
+    config as unknown as ConfigService,
   );
 
   afterEach(() => vi.clearAllMocks());
@@ -140,42 +153,59 @@ describe('UsersService', () => {
   });
 
   describe('create', () => {
-    it('guarda el hash argon2id, nunca la contraseña', async () => {
+    it('genera una temporal: guarda su hash con la marca y la devuelve una vez', async () => {
       prisma.user.create.mockResolvedValue(user());
 
-      await service.create({
+      const result = await service.create({
         email: 'jquispe@autofix.local',
+        documentNumber: '45678912',
         name: 'Juan Quispe',
         role: 'MECHANIC',
-        password: 'Mecanico123',
       });
 
       const { data } = prisma.user.create.mock.calls[0][0] as {
         data: Record<string, unknown>;
       };
-      expect(data).not.toHaveProperty('password');
+      expect(data).not.toHaveProperty('temporaryPassword');
+      expect(data).toMatchObject({
+        documentNumber: '45678912',
+        mustChangePassword: true,
+        passwordExpiresAt: result.expiresAt,
+      });
       expect(String(data.passwordHash)).toMatch(/^\$argon2id\$/);
+      expect(result.temporaryPassword).toHaveLength(12);
       expect(
-        await argon2.verify(String(data.passwordHash), 'Mecanico123'),
+        await argon2.verify(String(data.passwordHash), result.temporaryPassword),
       ).toBe(true);
     });
 
-    it('traduce un correo repetido a un 409 claro', async () => {
+    it('traduce un correo o un DNI repetido a un 409 claro', async () => {
+      const dto = {
+        email: 'jquispe@autofix.local',
+        documentNumber: '45678912',
+        name: 'Juan',
+        role: 'MECHANIC' as const,
+      };
       prisma.user.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('duplicado', {
           code: 'P2002',
           clientVersion: 'test',
+          meta: { target: ['email'] },
         }),
       );
-      await expect(
-        service.create({
-          email: 'jquispe@autofix.local',
-          name: 'Juan',
-          role: 'MECHANIC',
-          password: 'Mecanico123',
-        }),
-      ).rejects.toThrow(
+      await expect(service.create(dto)).rejects.toThrow(
         new ConflictException('Ya existe un usuario con ese correo'),
+      );
+
+      prisma.user.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('duplicado', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['document_number'] },
+        }),
+      );
+      await expect(service.create(dto)).rejects.toThrow(
+        new ConflictException('Ya existe un usuario con ese DNI'),
       );
     });
   });
@@ -217,7 +247,7 @@ describe('UsersService', () => {
       );
 
       expect(prisma.user.update).toHaveBeenCalled();
-      expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+      expect(sessions.revokeAll).not.toHaveBeenCalled();
     });
 
     it('no degrada ni desactiva al último administrador activo', async () => {
@@ -243,7 +273,7 @@ describe('UsersService', () => {
 
       await service.update('u1', { isActive: false }, ADMIN);
 
-      expect(sessions.revokeAllForUser).toHaveBeenCalledWith('u1');
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'u1' });
     });
 
     it('al cambiarle el rol cierra sus sesiones, si queda otro administrador', async () => {
@@ -255,7 +285,7 @@ describe('UsersService', () => {
 
       await service.update('a2', { role: 'MECHANIC' }, ADMIN);
 
-      expect(sessions.revokeAllForUser).toHaveBeenCalledWith('a2');
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'a2' });
     });
 
     it('editar datos sin cambiar rol ni estado no cierra sesiones', async () => {
@@ -269,7 +299,7 @@ describe('UsersService', () => {
       );
 
       expect(prisma.user.count).not.toHaveBeenCalled();
-      expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+      expect(sessions.revokeAll).not.toHaveBeenCalled();
     });
 
     it('traduce un correo repetido a un 409 claro', async () => {
@@ -288,26 +318,29 @@ describe('UsersService', () => {
     });
   });
 
-  describe('changePassword', () => {
-    it('guarda el hash nuevo y cierra sus sesiones', async () => {
+  describe('issueTemporaryPassword', () => {
+    it('guarda una temporal nueva con la marca y cierra sus sesiones', async () => {
       prisma.user.findUnique.mockResolvedValue(user());
       prisma.user.update.mockResolvedValue(user());
 
-      await service.changePassword('u1', 'OtraClave123');
+      const result = await service.issueTemporaryPassword('u1');
 
       const { data } = prisma.user.update.mock.calls[0][0] as {
-        data: { passwordHash: string };
+        data: { passwordHash: string; mustChangePassword: boolean };
       };
-      expect(await argon2.verify(data.passwordHash, 'OtraClave123')).toBe(true);
-      expect(sessions.revokeAllForUser).toHaveBeenCalledWith('u1');
+      expect(data.mustChangePassword).toBe(true);
+      expect(
+        await argon2.verify(data.passwordHash, result.temporaryPassword),
+      ).toBe(true);
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'u1' });
     });
 
     it('responde 404 si el usuario no existe', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
-      await expect(
-        service.changePassword('u1', 'OtraClave123'),
-      ).rejects.toThrow(NotFoundException);
-      expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+      await expect(service.issueTemporaryPassword('u1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(sessions.revokeAll).not.toHaveBeenCalled();
     });
   });
 

@@ -25,5 +25,9 @@ export const envsSchema = joi
     ACCESS_TOKEN_MINUTES: joi.number().integer().min(1).default(15),
     // Vida de la sesión: pasado este plazo sin refrescar, hay que volver a entrar.
     REFRESH_TOKEN_DAYS: joi.number().integer().min(1).default(7),
+    // Vida de una contraseña temporal (la que genera el sistema al crear un
+    // usuario o habilitar el portal de un cliente). Viaja por WhatsApp: que
+    // venza limita lo que queda expuesto en el chat si nadie la usa.
+    TEMPORARY_PASSWORD_DAYS: joi.number().integer().min(1).default(7),
   })
   .unknown(true);

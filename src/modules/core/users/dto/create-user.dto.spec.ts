@@ -1,18 +1,21 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { ChangeUserPasswordDto } from './change-user-password.dto.js';
 import { CreateUserDto } from './create-user.dto.js';
 
 const valid = {
   email: 'jquispe@autofix.local',
+  documentNumber: '45678912',
   name: 'Juan Quispe',
   role: 'MECHANIC',
-  password: 'Mecanico123',
 };
 
 async function check(body: Record<string, unknown>) {
   const dto = plainToInstance(CreateUserDto, body);
-  const errors = await validate(dto, { stopAtFirstError: true });
+  const errors = await validate(dto, {
+    stopAtFirstError: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  });
   return {
     dto,
     messages: errors.flatMap((error) => Object.values(error.constraints ?? {})),
@@ -29,6 +32,22 @@ describe('CreateUserDto', () => {
     expect(dto.email).toBe('jquispe@autofix.local');
   });
 
+  it('normaliza el DNI y exige sus 8 dígitos', async () => {
+    const { dto, messages } = await check({
+      ...valid,
+      documentNumber: ' 45.678.912 ',
+    });
+    expect(messages).toEqual([]);
+    expect(dto.documentNumber).toBe('45678912');
+
+    expect((await check({ ...valid, documentNumber: '1234' })).messages).toEqual(
+      ['El DNI tiene 8 dígitos'],
+    );
+    expect(
+      (await check({ ...valid, documentNumber: undefined })).messages,
+    ).toEqual(['Ingresa el DNI']);
+  });
+
   it('normaliza el teléfono y deja vacío como «sin teléfono»', async () => {
     expect((await check({ ...valid, phone: '987 654-321' })).dto.phone).toBe(
       '987654321',
@@ -38,28 +57,15 @@ describe('CreateUserDto', () => {
     expect(empty.dto.phone).toBeNull();
   });
 
-  it('exige una contraseña de 8 a 200 caracteres', async () => {
-    expect((await check({ ...valid, password: 'corta' })).messages).toEqual([
-      'La contraseña tiene al menos 8 caracteres',
-    ]);
+  it('no recibe contraseña: la genera el sistema', async () => {
     expect(
-      (await check({ ...valid, password: 'x'.repeat(201) })).messages,
-    ).toEqual(['La contraseña es demasiado larga']);
+      (await check({ ...valid, password: 'Mecanico123' })).messages,
+    ).toEqual(['property password should not exist']);
   });
 
   it('solo acepta los roles que existen', async () => {
     expect((await check({ ...valid, role: 'OWNER' })).messages).toEqual([
       'El rol es ADMIN o MECHANIC',
-    ]);
-  });
-});
-
-describe('ChangeUserPasswordDto', () => {
-  it('aplica la misma regla de contraseña que el alta', async () => {
-    const dto = plainToInstance(ChangeUserPasswordDto, { password: '1234567' });
-    const errors = await validate(dto, { stopAtFirstError: true });
-    expect(errors.flatMap((e) => Object.values(e.constraints ?? {}))).toEqual([
-      'La contraseña tiene al menos 8 caracteres',
     ]);
   });
 });

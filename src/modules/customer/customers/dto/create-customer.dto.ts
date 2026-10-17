@@ -20,7 +20,7 @@ import { DocumentType } from '../../../../generated/prisma/enums.js';
 import {
   documentNumberError,
   normalizeDocumentNumber,
-} from '../document-number.js';
+} from '../../../../shared/document-number.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -94,7 +94,12 @@ export class CreateCustomerDto {
     example: 'juan@correo.pe',
   })
   @IsOptional()
-  @TrimToNull()
+  // En minúsculas, como el del personal: también sirve para entrar al portal,
+  // y «Juan@Correo.pe» y «juan@correo.pe» son la misma persona. Vacío es «sin
+  // correo», igual que con TrimToNull.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() || null : value,
+  )
   @MaxLength(254, { message: 'El correo es demasiado largo' })
   @IsEmail({}, { message: 'Ingresa un correo válido' })
   email?: string | null;

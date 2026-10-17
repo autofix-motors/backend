@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { PrismaService } from '../../../core/database/prisma/prisma.service.js';
+import type { SessionsService } from '../../core/sessions/sessions.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
 import { CustomersService, customersWhere } from './customers.service.js';
 
@@ -52,7 +53,11 @@ describe('CustomersService', () => {
       delete: vi.fn(),
     },
   };
-  const service = new CustomersService(prisma as unknown as PrismaService);
+  const sessions = { revokeAllForCustomer: vi.fn() };
+  const service = new CustomersService(
+    prisma as unknown as PrismaService,
+    sessions as unknown as SessionsService,
+  );
 
   afterEach(() => vi.clearAllMocks());
 
@@ -105,6 +110,37 @@ describe('CustomersService', () => {
       BadRequestException,
     );
     expect(prisma.customer.update).not.toHaveBeenCalled();
+  });
+
+  it('al desactivarlo cierra sus sesiones del portal; al editar otra cosa, no', async () => {
+    prisma.customer.findUnique.mockResolvedValue(customer({ isActive: true }));
+    prisma.customer.update.mockResolvedValue(customer({ isActive: false }));
+
+    await service.update('c1', { isActive: false });
+    expect(sessions.revokeAllForCustomer).toHaveBeenCalledWith('c1');
+
+    sessions.revokeAllForCustomer.mockClear();
+    await service.update('c1', { name: 'Juan P.' });
+    expect(sessions.revokeAllForCustomer).not.toHaveBeenCalled();
+  });
+
+  it('busca candidatos del login solo entre clientes con acceso al portal', async () => {
+    prisma.customer.findMany.mockResolvedValue([]);
+
+    await service.findLoginCandidates({ kind: 'document', value: '45678912' });
+    expect(prisma.customer.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { account: { isNot: null }, documentNumber: '45678912' },
+        take: 5,
+      }),
+    );
+
+    await service.findLoginCandidates({ kind: 'email', value: 'a@b.pe' });
+    expect(prisma.customer.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { account: { isNot: null }, email: 'a@b.pe' },
+      }),
+    );
   });
 
   it('no borra un cliente con vehículos u órdenes, y dice por qué', async () => {

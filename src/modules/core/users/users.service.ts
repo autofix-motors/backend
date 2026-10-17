@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import argon2 from 'argon2';
+import { ConfigService } from '@nestjs/config';
+import {
+  generateTemporaryPassword,
+  hashPassword,
+  temporaryPasswordExpiry,
+} from '../../../core/auth/passwords.js';
 import type { SessionUser } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
@@ -14,7 +19,7 @@ import {
   paginationMeta,
   type Page,
 } from '../../../shared/pagination.js';
-import { SessionsService } from '../auth/sessions.service.js';
+import { SessionsService } from '../sessions/sessions.service.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 import type { ListUsersQueryDto } from './dto/list-users-query.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
@@ -53,7 +58,14 @@ const HISTORY_SELECT = Object.fromEntries(
 ) as Record<keyof typeof HISTORY_LABELS, true>;
 
 const NOT_FOUND = 'No se encontró el usuario';
-const DUPLICATE = 'Ya existe un usuario con ese correo';
+const DUPLICATE_EMAIL = 'Ya existe un usuario con ese correo';
+const DUPLICATE_DOCUMENT = 'Ya existe un usuario con ese DNI';
+
+/** La contraseña temporal recién generada: se muestra una sola vez. */
+export interface TemporaryPasswordResult {
+  temporaryPassword: string;
+  expiresAt: Date;
+}
 const LAST_ADMIN =
   'Es el último administrador activo: el taller necesita al menos uno. Asigna antes el rol a otro usuario';
 
@@ -62,6 +74,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
+    private readonly config: ConfigService,
   ) {}
 
   async findAll(query: ListUsersQueryDto): Promise<Page<UserWithCounts>> {
@@ -89,12 +102,21 @@ export class UsersService {
     return user;
   }
 
-  async create({ password, ...data }: CreateUserDto): Promise<UserWithCounts> {
+  /**
+   * Registra al usuario con una contraseña temporal que genera el sistema: el
+   * administrador se la comparte y el usuario la cambia al entrar.
+   */
+  async create(
+    data: CreateUserDto,
+  ): Promise<{ user: UserWithCounts } & TemporaryPasswordResult> {
+    const { temporaryPassword, expiresAt, ...access } =
+      await this.temporaryAccess();
     try {
-      return await this.prisma.user.create({
-        data: { ...data, passwordHash: await hashPassword(password) },
+      const user = await this.prisma.user.create({
+        data: { ...data, ...access },
         include: WITH_COUNTS,
       });
+      return { user, temporaryPassword, expiresAt };
     } catch (error) {
       throw translateDuplicate(error);
     }
@@ -145,23 +167,25 @@ export class UsersService {
     // El rol viaja en el JWT: sin esto, con el refresco seguiría renovando un
     // token con el rol viejo. El que ya tiene vence en ACCESS_TOKEN_MINUTES.
     if (isRoleChange || isDeactivation) {
-      await this.sessions.revokeAllForUser(userId);
+      await this.sessions.revokeAll({ userId });
     }
     return user;
   }
 
   /**
-   * El administrador le asigna una contraseña nueva (no hay «olvidé mi
+   * Restablece la contraseña con una temporal nueva (no hay «olvidé mi
    * contraseña»: el taller no envía correos). Se cierran sus sesiones para que
    * quien tenga la anterior no siga dentro.
    */
-  async changePassword(userId: string, password: string): Promise<void> {
+  async issueTemporaryPassword(
+    userId: string,
+  ): Promise<TemporaryPasswordResult> {
     await this.findOne(userId);
-    await this.prisma.user.update({
-      where: { userId },
-      data: { passwordHash: await hashPassword(password) },
-    });
-    await this.sessions.revokeAllForUser(userId);
+    const { temporaryPassword, expiresAt, ...access } =
+      await this.temporaryAccess();
+    await this.prisma.user.update({ where: { userId }, data: access });
+    await this.sessions.revokeAll({ userId });
+    return { temporaryPassword, expiresAt };
   }
 
   /**
@@ -195,6 +219,21 @@ export class UsersService {
     await this.prisma.user.delete({ where: { userId } });
   }
 
+  /** Una temporal nueva, con lo que hay que guardar de ella. */
+  private async temporaryAccess() {
+    const temporaryPassword = generateTemporaryPassword();
+    const expiresAt = temporaryPasswordExpiry(
+      this.config.getOrThrow<number>('TEMPORARY_PASSWORD_DAYS'),
+    );
+    return {
+      temporaryPassword,
+      expiresAt,
+      passwordHash: await hashPassword(temporaryPassword),
+      mustChangePassword: true,
+      passwordExpiresAt: expiresAt,
+    };
+  }
+
   /**
    * Antes de que un administrador activo deje de serlo (por rol, baja o
    * borrado), tiene que quedar otro. Se cuentan solo los activos: uno dado de
@@ -218,6 +257,7 @@ export function usersWhere(
       OR: [
         { name: { contains: query.search, mode: 'insensitive' } },
         { email: { contains: query.search, mode: 'insensitive' } },
+        { documentNumber: { contains: query.search.replace(/[\s.-]/g, '') } },
       ],
     }),
   };
@@ -252,18 +292,16 @@ export function describeHistory(counts: HistoryCounts): string {
   return `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}`;
 }
 
-// El mismo hash que el administrador sembrado (prisma/seeds/core.seed.ts), que
-// es el que verifica el login.
-function hashPassword(password: string): Promise<string> {
-  return argon2.hash(password, { type: argon2.argon2id });
-}
-
 function translateDuplicate(error: unknown): unknown {
   if (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002'
   ) {
-    return new ConflictException(DUPLICATE);
+    // El índice único que chocó dice cuál de los dos se repite.
+    const target = JSON.stringify(error.meta?.target ?? '');
+    return new ConflictException(
+      target.includes('document') ? DUPLICATE_DOCUMENT : DUPLICATE_EMAIL,
+    );
   }
   return error;
 }

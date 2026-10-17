@@ -6,6 +6,7 @@ import { envsSchema } from './core/config/envs.js';
 import { PrismaModule } from './core/database/prisma/prisma.module.js';
 import { ApiExceptionFilter } from './core/filters/api-exception.filter.js';
 import { AccessGuard } from './core/guards/access.guard.js';
+import { PasswordChangeGuard } from './core/guards/password-change.guard.js';
 import { RolesGuard } from './core/guards/roles.guard.js';
 import { CoreModule } from './modules/core/core.module.js';
 import { CustomerModule } from './modules/customer/customer.module.js';
@@ -28,11 +29,13 @@ import { WorkshopModule } from './modules/workshop/workshop.module.js';
   ],
   controllers: [AppController],
   providers: [
-    // Todo endpoint exige sesión salvo los marcados con @Public(), y los que
-    // declaran @Roles() exigen además uno de esos roles. El orden importa: el
-    // de roles lee el usuario que deja el de acceso.
+    // Todo endpoint exige sesión salvo los marcados con @Public(); el de roles
+    // decide si entra el personal (por rol) o un cliente (solo en su portal), y
+    // el último corta todo mientras la contraseña temporal no se cambie. El
+    // orden importa: los dos últimos leen lo que deja el de acceso.
     { provide: APP_GUARD, useClass: AccessGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PasswordChangeGuard },
     // Todo error sale con el formato de BaseResponseDto.
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
   ],

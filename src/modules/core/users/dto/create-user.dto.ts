@@ -8,8 +8,8 @@ import {
   IsString,
   Matches,
   MaxLength,
-  MinLength,
 } from 'class-validator';
+import { normalizeDocumentNumber } from '../../../../shared/document-number.js';
 import { UserRole } from '../../../../generated/prisma/enums.js';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -28,6 +28,18 @@ export class CreateUserDto {
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa el correo' })
   email: string;
+
+  @ApiProperty({
+    example: '45678912',
+    description: 'DNI: con él o con el correo inicia sesión',
+  })
+  // Como el de un cliente: sin espacios, puntos ni guiones.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeDocumentNumber(value) : value,
+  )
+  @Matches(/^\d{8}$/, { message: 'El DNI tiene 8 dígitos' })
+  @IsString({ message: 'Ingresa el DNI' })
+  documentNumber: string;
 
   @ApiProperty({ example: 'Juan Quispe Mamani', maxLength: 120 })
   @Transform(trim)
@@ -53,12 +65,6 @@ export class CreateUserDto {
   @IsEnum(UserRole, { message: 'El rol es ADMIN o MECHANIC' })
   role: UserRole;
 
-  @ApiProperty({ format: 'password', minLength: 8, maxLength: 200 })
-  // Tope para que nadie mande una contraseña de megabytes: argon2 la procesaría
-  // entera y es caro a propósito. El mínimo es el mismo del administrador
-  // sembrado (ADMIN_PASSWORD).
-  @MaxLength(200, { message: 'La contraseña es demasiado larga' })
-  @MinLength(8, { message: 'La contraseña tiene al menos 8 caracteres' })
-  @IsString({ message: 'Ingresa la contraseña' })
-  password: string;
+  // Sin contraseña: la genera el sistema (temporal) y el usuario la cambia al
+  // entrar. El administrador no conoce la contraseña de nadie.
 }
