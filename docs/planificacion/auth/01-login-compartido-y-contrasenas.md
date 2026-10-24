@@ -88,6 +88,6 @@ Sin listados nuevos. El de usuarios busca también por DNI.
   acceso, generador). Contra la API real: un token de cliente recibe 403 en
   los endpoints del personal y uno con la temporal, 403 hasta cambiarla.
 - [x] Frontend (nota en `frontend/docs/planificacion/auth/`).
-- [ ] Validación de quien dirige el proyecto desde el frontend: revisó el alta
-  de personal con su contraseña temporal (2026-10-16); falta recorrer el
-  acceso del cliente completo.
+- [x] Validación de quien dirige el proyecto desde el frontend: revisó el alta
+  de personal con su contraseña temporal (2026-10-16) y el acceso del cliente
+  de punta a punta al validar el portal (2026-10-24).

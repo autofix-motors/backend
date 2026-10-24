@@ -49,6 +49,24 @@ Reglas:
 
 ---
 
+## 2026-10-18
+
+### Portal del cliente — Eduardo Huarcaya · 16:33
+commits [`583a568`](../../commit/583a568) · [`d28d620`](../../commit/d28d620) · [`2753958`](../../commit/2753958)
+
+El cliente con acceso ve sus vehículos y sus órdenes (en curso y anteriores) y
+responde el presupuesto desde su cuenta (`/portal/...`, solo sesiones de
+cliente). El detalle trae diagnóstico, mecánico, ítems y totales, línea de
+tiempo pública y presupuestos, sin costos ni datos del personal. La respuesta
+queda con canal `PORTAL` y sin autor. Sus vehículos, paginados y con búsqueda.
+Planes en `docs/planificacion/portal/`.
+
+> **IMPORTANTE** — Migración `20261018212045_decision_desde_el_portal`
+> (`DecisionChannel` suma `PORTAL`; `workshop_work_order_event.created_by_id`
+> pasa a opcional). Cambia el contrato: el DTO de la respuesta del personal usa
+> `StaffDecisionChannel` (sin `PORTAL`) y `WorkOrderEvent.createdBy` puede ser
+> null; el frontend tiene que regenerar sus tipos.
+
 ## 2026-10-16
 
 ### Catálogo base del taller en el seed — Eduardo Huarcaya · 23:55

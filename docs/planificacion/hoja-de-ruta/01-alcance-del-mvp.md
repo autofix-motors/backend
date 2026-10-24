@@ -2,7 +2,8 @@
 
 AutoFix Motors reemplaza el trabajo manual de un taller mecánico: quién trajo
 qué vehículo, qué se le hizo, con qué repuestos, cuánto se cobró y en qué estado
-está. El cliente sigue el avance desde una página pública, sin cuenta.
+está. El cliente sigue el avance desde su portal, con la cuenta que le habilita
+el taller (antes: una página pública por código; ver «Seguimiento público»).
 
 Es un proyecto chico a propósito: lo necesario para llevar el seguimiento de los
 servicios y saber cuánto generan. No es un ERP.
@@ -13,7 +14,7 @@ servicios y saber cuánto generan. No es un ERP.
 |---|---|---|
 | Acceso del cliente al seguimiento | **Código por orden** (aleatorio, ej. `AFM-7K3Q9X`) | La placa sola no sirve: se ve en la calle y cualquiera vería el estado del auto de otro |
 | Dinero | **Pagos por orden + reportes**, sin gastos del taller | Lo que el taller necesita saber es cuánto generan las reparaciones; registrar egresos es otra captura diaria que no se pidió |
-| Presupuesto | **Lo aprueba el administrador**, con la respuesta del cliente | El cliente responde por teléfono, WhatsApp o en el taller; el administrador lo registra. La página pública no tiene acciones: solo informa |
+| Presupuesto | **Lo responde el cliente desde su portal**, o el administrador registra la respuesta que llega por teléfono, WhatsApp o en el taller | Cambió en 2026-10 (antes solo el administrador): el canal «Portal» dice que respondió el propio cliente |
 | Mecánico | **Ve solo sus órdenes asignadas** | El administrador asigna y reasigna; el mecánico no se distrae con lo ajeno |
 
 ## La pieza central: la orden de trabajo
@@ -51,13 +52,18 @@ Cada cambio de estado guarda fecha, usuario y una nota opcional, marcada como
 | `inventory` | `tools` | Herramientas: código, estado (operativa, en reparación, de baja), mecánico que la tiene |
 | `finance` | `payments` | Pagos por OT: efectivo, Yape/Plin, tarjeta, transferencia. Adelantos y saldo pendiente |
 | `finance` | `reports` | Ingresos por período, por servicio y por mecánico; mano de obra frente a repuestos; margen de repuestos |
-| `workshop` | `tracking` | Seguimiento público sin sesión. Sin tablas propias: lee las de la orden |
+| `workshop` | `portal` | Portal del cliente (reemplaza a `tracking`): sus vehículos, sus órdenes y la respuesta a los presupuestos. Sin tablas propias |
 
 **Inicio (dashboard):** órdenes abiertas por estado, listas para entregar,
 vencidas (pasó la fecha prometida), ingresos del mes (solo ADMIN) y productos con
 stock bajo.
 
 ## Seguimiento público
+
+> **Cambió en 2026-10:** el seguimiento es con sesión, en el **portal del
+> cliente** (planes `auth/01-login-compartido-y-contrasenas.md` y
+> `portal/01-portal-del-cliente.md`). Lo que sigue es la decisión original, que
+> queda como referencia.
 
 - Cada OT nace con un **código de seguimiento** aleatorio y no secuencial
   (`AFM-7K3Q9X`). Va impreso en la constancia de ingreso y se comparte con un
@@ -99,8 +105,6 @@ stock bajo.
   comprobante.
 - Citas o reservas en línea.
 - Notificaciones automáticas (SMS, correo, API de WhatsApp).
-- Que el cliente apruebe o rechace el presupuesto desde la página pública: lo
-  registra el administrador.
 - Aplicación móvil.
 - Varias sedes.
 - Planillas, asistencia o sueldos del personal.
@@ -115,13 +119,14 @@ Cada fase tiene su propio plan detallado en `docs/planificacion/<módulo>/`
 antes de implementar, y se trabaja en una rama `feature/...` con su PR en
 **backend** y **frontend**.
 
-- [ ] **Fase 1 — Personal, clientes y vehículos.** `core/users`,
+- [x] **Fase 1 — Personal, clientes y vehículos.** `core/users`,
   `customer/customers`, `customer/vehicles`.
-- [ ] **Fase 2 — Servicios.** Catálogo de servicios, órdenes de trabajo con
+- [x] **Fase 2 — Servicios.** Catálogo de servicios, órdenes de trabajo con
   estados y línea de tiempo, presupuestos versionados.
-- [ ] **Fase 3 — Seguimiento público.** Página por código con el estado, la
-  línea de tiempo y el presupuesto vigente.
-- [ ] **Fase 4 — Inventario.** Productos, movimientos, consumo desde la OT,
+- [x] **Fase 3 — Portal del cliente** (antes «Seguimiento público»). Acceso
+  con cuenta, sus vehículos y órdenes, y la respuesta a los presupuestos.
+  Validada el 2026-10-24.
+- [x] **Fase 4 — Inventario.** Productos, movimientos, consumo desde la OT,
   herramientas.
 - [ ] **Fase 5 — Ingresos.** Pagos por orden, reportes y dashboard de inicio.
 
