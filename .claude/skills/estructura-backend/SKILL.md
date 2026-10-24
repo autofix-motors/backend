@@ -414,7 +414,39 @@ export class CreateCustomerDto {
   class-validator da en inglés, el de la propiedad de más, lo traduce el
   `exceptionFactory` del pipe.
 - **El DTO de edición es `PartialType` de `@nestjs/swagger`**, no el de
-  `@nestjs/mapped-types`, para conservar la documentación.
+  `@nestjs/mapped-types`, para conservar la documentación, y **siempre con
+  `{ skipNullProperties: false }`**: con el default, `{ "name": null }` salta la
+  validación y la base lo rechaza con un 500. Los opcionales siguen aceptando
+  `null` por su propio `@IsOptional`. Un campo **opcional pero no anulable**
+  (un enum con default, como el `status` de una herramienta) usa
+  `@ValidateIf((_dto, value) => value !== undefined)` en vez de `@IsOptional`:
+  así un `null` se valida (400) en vez de llegar a la base. Ejemplo real:
+  `modules/inventory/tools/dto/create-tool.dto.ts`.
+- **Un monto en soles se valida con `@ToMoneyText()` y `@IsMoney('El precio…')`**
+  (`src/core/validation/money.ts`): acepta texto o número, lo deja como
+  texto y exige no negativo, hasta 2 decimales y hasta 99999999.99 (lo que cabe
+  en `Decimal(10, 2)`). Nunca `@IsNumber`: un `number` redondea en silencio
+  («12.345» pasaría como 12.35). En una query, un `Transform` que convierta el
+  texto vacío en `undefined` va en lugar de `@ToMoneyText()`. Ejemplo real:
+  `modules/workshop/service-catalog/dto/`.
+- **Una cantidad en la unidad de un producto** (stock mínimo, la cantidad de un
+  movimiento) se valida igual, con `@ToQuantityText()` y
+  `@IsQuantity('El stock mínimo')` (`src/core/validation/quantity.ts`). Las
+  reglas de `Decimal(10, 2)` viven una vez en `decimal.ts`; `money.ts` y
+  `quantity.ts` solo ponen sus mensajes. Ejemplo real:
+  `modules/inventory/products/dto/`. La cantidad de un **movimiento** nunca
+  es 0: `@IsMovementQuantity('La cantidad', { signed })`, mayor que 0 sin
+  `signed` (una compra) y con su signo con `signed` (un ajuste). Ejemplo
+  real: `modules/inventory/stock-movements/dto/`.
+- **Un día sin hora** (un filtro `from`/`to`) se valida con
+  `@IsDateOnly('La fecha desde')` (`src/core/validation/date-only.ts`):
+  `AAAA-MM-DD` y que el día exista. Es un día **de Lima**: el `where` lo
+  convierte con `limaDayRange(from, to)` (`src/shared/lima-dates.ts`), con
+  `to` inclusivo. Tomarlo en UTC correría al día siguiente lo registrado
+  después de las 19:00. «Hoy» es `limaToday()` (una fecha prometida no
+  anterior a hoy, una orden vencida). Una columna `@db.Date` se escribe con
+  `toDateColumn(día)` y sale como día con `fromDateColumn(fecha)`
+  (`src/shared/date-column.ts`). Ejemplo real: `modules/workshop/work-orders/`.
 - **El `:id` de la ruta se valida con `ParseIdPipe`**
   (`@Param('id', ParseIdPipe)`). Sin él, un id mal formado llega a Postgres y
   sale como 500.
@@ -454,13 +486,54 @@ usuario campo por campo para que el hash de la contraseña nunca salga.
   clase existe para impedir.
 - **No uses `implements`** contra el tipo de Prisma: obliga a declarar todas las
   columnas, lo contrario de lo que este archivo hace.
+- **Un campo que un rol no puede ver** (el costo y el margen de un repuesto,
+  que el mecánico no ve) es opcional en la misma entidad, con
+  `@ApiPropertyOptional` y «Solo para ADMIN» en su descripción, y el
+  constructor lo copia solo si el controller se lo pide
+  (`new Product(product, { includeCosts })`, calculado con `@CurrentUser()`).
+  Para el otro rol la clave no sale en el JSON. Una sola entidad y no dos: es
+  el mismo recurso en el mismo endpoint. Ejemplo real:
+  `modules/inventory/products/`.
 - **Los `Decimal` salen como cadena, con `.toFixed(2)`.** Prisma los devuelve
   como objetos de decimal.js para no perder céntimos; serializados sin más,
   `180.50` viaja como `"180.5"` y el céntimo se pierde al cuadrar totales.
-- La respuesta se declara con `@ApiOkResponse({ type: ... })`. El tipo de
-  retorno de TypeScript no alcanza: sin el plugin de CLI de `@nestjs/swagger`
-  —que este proyecto no usa—, el decorador es la única fuente de la
-  documentación.
+- **Un monto calculado** (el subtotal y los totales de una orden) se calcula
+  con `Prisma.Decimal`, nunca con `number`, en una función pura con su test
+  (`modules/workshop/work-orders/work-order-totals.ts`): cada línea se
+  redondea a céntimos y los totales suman las líneas ya redondeadas, para que
+  cuadren con lo que se ve. No se guarda: sale de sus ítems.
+- La respuesta se declara con `@ApiBaseResponse(Modelo)` o
+  `@ApiPaginatedResponse(Modelo)` (`src/shared/swagger/`), no con
+  `@ApiOkResponse`. Una lista corta sin paginar (las opciones de un filtro,
+  como `GET /vehicles/brands`) es `@ApiBaseResponse(Modelo, { isArray: true })`. El tipo de retorno de TypeScript no alcanza: sin el plugin
+  de CLI de `@nestjs/swagger` —que este proyecto no usa—, el decorador es la
+  única fuente de la documentación, y Swagger no entiende el genérico
+  `BaseResponseDto<T>` sin ayuda.
+
+### Toda respuesta va en `BaseResponseDto`
+
+El controlador nunca devuelve la entidad suelta: la envuelve con
+`BaseResponseDto.success(data, mensaje, status?, meta?)`
+(`src/shared/dto/base-response.dto.ts`). El `mensaje` es en español y es lo que
+el frontend le muestra al usuario («Cliente registrado»). Los errores no se
+envuelven a mano: se lanza la excepción de Nest con su mensaje y el filtro
+global (`src/core/filters/api-exception.filter.ts`) arma la respuesta, igual que
+con los errores de Prisma.
+
+- **Borrar** responde 200 con `data: null` y un mensaje, no 204: el formato es
+  el mismo para todo.
+- **Un listado** recibe un DTO que extiende `PaginationQueryDto`
+  (`page`, `pageSize`, `search`) con sus filtros, y el service devuelve un
+  `Page<T>` (`src/shared/pagination.ts`): `findMany` y `count` con el mismo
+  `where` en una `$transaction`, `pageWindow()` para `skip`/`take`, y un
+  desempate por la clave primaria en `orderBy` para que las páginas no se
+  pisen. La paginación sale en `meta`.
+- **Un filtro que compara dos columnas de la misma fila** (stock bajo:
+  `stock <= minStock`) usa la referencia a la columna,
+  `this.prisma.product.fields.minStock`, como valor del filtro. La función que
+  arma el `where` la recibe por parámetro (`productsWhere(query, minStock)`)
+  para probarla sin base.
+- **El ejemplo real** es `modules/customer/customers/`.
 
 ### El service consulta directo
 
@@ -588,6 +661,11 @@ login(@Body() dto: LoginDto) { … }
 session(@CurrentUser() user: SessionUser) { … }
 ```
 
+- **Si los roles cambian según el endpoint, `@Roles` va en cada método** y no
+  en la clase: el del método reemplaza al de la clase (`getAllAndOverride`), y
+  mezclarlos obliga a leer los dos para saber quién entra. Ejemplo real:
+  `ServiceCatalogController`, que el mecánico consulta y solo el administrador
+  modifica.
 - **Un endpoint público se marca con `@Public()`.** Un endpoint desprotegido
   tiene que ser una decisión visible, no un olvido.
 - **Los roles los define el código**: son el enum `UserRole` de `core.prisma`
@@ -597,7 +675,12 @@ session(@CurrentUser() user: SessionUser) { … }
   - `@Roles` recibe `UserRole`: un rol mal escrito no compila.
 - **El rol viaja en el JWT**, así que los guards no consultan la base.
   Consecuencia: un cambio de rol o una baja tardan hasta `ACCESS_TOKEN_MINUTES`
-  en notarse. El refresco sí consulta la base y rechaza al usuario inactivo.
+  en notarse. El refresco sí consulta la base y rechaza al usuario inactivo, y
+  `users` cierra sus sesiones (`SessionsService.revokeAllForUser`) al
+  desactivarlo o cambiarle el rol o la contraseña.
+- **Una regla que depende de quién actúa** (nadie se desactiva ni se borra a sí
+  mismo) la decide el service: el controller lee `@CurrentUser()` y se lo pasa
+  como `actor: SessionUser`. Ejemplo real: `UsersService.update` y `remove`.
 - **La cookie de refresco (`afm_refresh`) solo viaja a `/auth`.** El flujo
   (rotación del refresh, detección de reuso) está explicado en los comentarios
   de `modules/core/auth/` y en el `///` de `Session`.
@@ -613,7 +696,101 @@ desde `work-orders.service.ts`.
 > una columna nadie se entera hasta que falla en ejecución, porque el cambio no
 > aparece en ningún import.
 
+El ejemplo real: `VehiclesModule` importa `CustomersModule`, que exporta
+`CustomersService`, y verifica al dueño con `customers.findOne()`. Leer la
+relación del propio modelo con `include` (el cliente resumido de cada vehículo)
+sí está permitido: es la consulta del módulo dueño de `Vehicle`. Igual
+`ToolsModule` con `UsersModule` (`users.findOne()` para asignar una
+herramienta solo a un usuario activo). Y `WorkOrdersModule` con
+`VehiclesModule`, `CustomersModule` y `UsersModule`: el vehículo que ingresa,
+su dueño (que tiene que estar activo) y el mecánico, cada uno por su service;
+y, para sus ítems, con `ServiceCatalogModule`, `ProductsModule` y
+`StockMovementsModule` (el servicio o repuesto que se agrega y el stock que
+mueve).
+
 Si dos módulos se necesitan todo el tiempo, probablemente son uno.
+
+### Transacción con stock
+
+El stock de `Product` es la suma de sus movimientos, guardada aparte
+(redundancia deliberada): el movimiento y el cambio de stock se guardan en la
+**misma transacción**, o ninguno. La tabla de productos es de `products`, así
+que nadie más la escribe: el cambio se le pide a su service, pasándole la
+transacción.
+
+```ts
+// stock-movements.service.ts (resumido)
+purchase(dto: CreatePurchaseDto, createdById: string) {
+  return this.prisma.$transaction((tx) =>
+    this.record(tx, { type: 'PURCHASE', ...dto, createdById }),
+  );
+}
+
+async record(tx: Prisma.TransactionClient, movement: NewStockMovement) {
+  const product = await this.products.applyStockChange(tx, movement);
+  return tx.stockMovement.create({ data: { …, unitCost: product.cost } });
+}
+```
+
+- **`ProductsService.applyStockChange(tx, { productId, type, quantity,
+  unitCost? })`** es la única escritura del stock y del costo. La salida es un
+  solo `updateMany` con `stock: { gte: -Δ }` en el `where` e `increment` en el
+  `data`: comparar y descontar en la misma sentencia hace que dos salidas a la
+  vez no dejen el stock negativo (si `count` es 0, 409 «Stock insuficiente:
+  quedan X de CÓDIGO»). Leer, comparar y escribir en dos pasos no lo protege.
+  Una compra actualiza el costo; compras y ajustes exigen el producto activo,
+  el consumo en una orden no.
+- **`StockMovementsService.record(tx, movimiento)`** crea el movimiento y
+  mueve el stock en la transacción que recibe. Un módulo que mueve stock como
+  parte de su propia escritura (el ítem de repuesto de una orden de trabajo)
+  importa `StockMovementsModule` —que entonces exporta su service— y llama a
+  `record` dentro de **su** `$transaction`, con `type: 'WORK_ORDER'` y el
+  `workOrderItemId` (el tipo lo exige). Nunca escribe `stockMovement` ni
+  `product.stock` por su cuenta.
+- **Dentro de la transacción todo va por `tx`**, no por `this.prisma`: una
+  consulta con `this.prisma` corre fuera de la transacción y no ve lo que
+  todavía no se confirmó.
+- **La reversión también va en una transacción con lo que la causa.** Quitar
+  el repuesto de una orden borra el ítem y registra la devolución
+  (`WORK_ORDER` positivo, sin ítem, con la orden en la nota) en la misma
+  `$transaction`, con el `delete` primero: si otro ya lo quitó, el `delete`
+  falla y el stock no vuelve dos veces. El movimiento original no se toca:
+  queda en el kardex con su ítem en null (`SetNull`).
+- **El orden dentro de la transacción importa**: primero lo que el movimiento
+  referencia (el ítem, por su clave foránea), después `record`, y al final la
+  escritura que comprueba el estado (`where: { …, status }`), que si falla
+  deshace las dos anteriores.
+- Ejemplos reales: `modules/inventory/stock-movements/`,
+  `ProductsService.applyStockChange` y
+  `modules/workshop/work-orders/work-order-items.service.ts`.
+
+### Estados con reglas y su historial
+
+La orden de trabajo es el ejemplo real (`modules/workshop/work-orders/`):
+
+- **Las transiciones son una tabla pura** (`MANUAL_TRANSITIONS` y
+  `canTransition(from, to, role)` en `work-order-status.ts`), probada par por
+  par para cada rol. Fuera de la tabla, 409; en la tabla pero no para el rol,
+  403. Un estado al que se llega por otro camino (el presupuesto lleva a
+  `WAITING_APPROVAL`) no va en la tabla de los botones: va en
+  `SYSTEM_TRANSITIONS` del mismo archivo, con `canApplySystemTransition`, y
+  lo aplica el service que lo causa (`WorkOrderQuotesService`), con su regla,
+  creando el mismo evento. El frontend copia solo la tabla de los botones.
+- **Una foto versionada** (el presupuesto) copia lo que se congela —tipo,
+  descripción, cantidad, precio, sin costo— a su propia tabla, sin apuntar al
+  registro vivo, y numera la versión dentro de su padre (la última + 1). Se
+  escribe en la misma transacción que el cambio de estado, con el estado
+  **primero**: toma la fila del padre y lo que se lee después ya no cambia.
+- **El cambio y su evento se escriben juntos**, anidando el evento en la misma
+  escritura (`update({ data: { status, events: { create: … } } })`): Prisma
+  los guarda en una transacción, sin `$transaction` explícita.
+- **El estado leído va en el `where`** de la escritura (`{ workOrderId,
+  status: from }`): si otro lo cambió entre medio, Prisma lanza P2025 y se
+  responde 409 «cambió mientras tanto», en vez de pisarlo.
+- **Un recurso que un rol solo ve si le pertenece** (la orden del mecánico
+  asignado) da 404 a los demás, no 403: el 403 confirmaría que existe. El
+  `findOne(id, actor)` del service lo decide, y todas las acciones pasan por
+  él; en el listado, el service fuerza el filtro (`mechanicId` de la sesión).
 
 ## Servicios externos
 

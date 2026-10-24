@@ -7,17 +7,19 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ACCESS_COOKIE } from '../auth/cookies.js';
-import type {
-  AccessPayload,
-  RequestWithSession,
+import {
+  CUSTOMER_ROLE,
+  type AccessPayload,
+  type RequestWithSession,
 } from '../auth/session-user.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 /**
  * Guard global: toda petición necesita un JWT de acceso válido en la cookie
  * afm_access, salvo los endpoints marcados con @Public(). Si el token es
- * válido, deja el usuario en la petición para @CurrentUser() y el
- * RolesGuard.
+ * válido, deja en la petición al usuario del personal (`request.user`, para
+ * @CurrentUser()) o al cliente (`request.customer`), nunca a los dos, y la
+ * marca de contraseña temporal para el PasswordChangeGuard.
  *
  * No consulta la base: la firma y el vencimiento del token alcanzan. Por eso un
  * usuario dado de baja conserva el acceso hasta que su token vence; el refresco
@@ -52,7 +54,14 @@ export class AccessGuard implements CanActivate {
       throw new UnauthorizedException('Tu sesión expiró');
     }
 
-    request.user = { userId: payload.sub, role: payload.role };
+    if (payload.role === CUSTOMER_ROLE) {
+      request.customer = { customerId: payload.sub };
+    } else {
+      request.user = { userId: payload.sub, role: payload.role };
+    }
+    // Un token emitido antes de que existiera la marca no la trae: no está
+    // pendiente.
+    request.mustChangePassword = payload.mustChangePassword === true;
     return true;
   }
 }

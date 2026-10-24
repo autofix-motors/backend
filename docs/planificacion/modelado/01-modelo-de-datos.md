@@ -49,7 +49,9 @@ exista.
 
 - `WorkOrderItem`: `serviceCatalogItemId` si `type` es `SERVICE`, `productId` si
   es `PRODUCT`; nunca los dos.
-- `StockMovement`: `workOrderItemId` obligatorio si `type` es `WORK_ORDER`;
+- `StockMovement`: `workOrderItemId` obligatorio en la salida `WORK_ORDER` (la
+  devolución de un ítem quitado de la orden es `WORK_ORDER` positiva, sin ítem
+  y con la orden en la nota);
   `unitCost` obligatorio en `PURCHASE`. `quantity` positiva entra, negativa sale.
 - `WorkOrder`: `cancelReason` obligatorio al pasar a `CANCELLED`; `deliveredAt`
   se llena al pasar a `DELIVERED`.

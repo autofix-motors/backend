@@ -1,34 +1,44 @@
-/// Quien entra al sistema: el personal del taller. Los clientes del taller no
-/// inician sesión, así que no son usuarios.
+/// Quien entra al sistema como personal del taller. Los clientes también
+/// inician sesión, pero en su portal y con su propia cuenta
+/// (`CustomerAccount`): no son usuarios.
 model User {
-  userId       String    @id @default(uuid()) @map("user_id") @db.Uuid
+  userId             String    @id @default(uuid()) @map("user_id") @db.Uuid
   /// Se guarda siempre en minúsculas: es con lo que se inicia sesión, y
   /// «Juan@Taller.pe» y «juan@taller.pe» son la misma persona.
-  email        String    @unique
-  name         String
+  email              String    @unique
+  /// DNI, solo los 8 dígitos. Con él o con el correo se inicia sesión.
+  /// Opcional porque el personal registrado antes de pedirlo no lo tiene:
+  /// entra por correo hasta que se le cargue.
+  documentNumber     String?   @unique @map("document_number") @db.VarChar(8)
+  name               String
   /// Para ubicar al personal; no se usa para iniciar sesión.
-  phone        String?   @db.VarChar(20)
+  phone              String?   @db.VarChar(20)
   /// Un usuario tiene un solo rol. El taller solo necesita dos, así que lo que
   /// puede hacer cada uno se decide por rol, sin tabla de permisos.
-  role         UserRole  @default(MECHANIC)
+  role               UserRole  @default(MECHANIC)
   /// Hash argon2id de la contraseña, con su sal y parámetros incluidos. La
   /// contraseña nunca se guarda. Opcional: un usuario sin contraseña existe
   /// pero no puede iniciar sesión hasta que se le asigne una.
-  passwordHash String?   @map("password_hash")
-  /// Un usuario no se borra, se da de baja: lo que registró tiene que seguir
-  /// teniendo autor. Uno inactivo no puede iniciar sesión ni refrescar la suya.
-  isActive     Boolean   @default(true) @map("is_active")
+  passwordHash       String?   @map("password_hash")
+  /// La contraseña es temporal (la generó el sistema al crear el usuario o al
+  /// restablecerla): hasta cambiarla, solo puede ver su sesión y cambiarla.
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  /// Hasta cuándo sirve la temporal. Vacío si la eligió el propio usuario.
+  passwordExpiresAt  DateTime? @map("password_expires_at")
+  /// Uno inactivo no puede iniciar sesión ni refrescar la suya. Borrarlo de
+  /// verdad solo se puede si no registró nada: lo que hizo necesita su autor.
+  isActive           Boolean   @default(true) @map("is_active")
   /// El último inicio de sesión correcto. Sirve para detectar cuentas
   /// abandonadas y para auditoría.
-  lastLoginAt  DateTime? @map("last_login_at")
+  lastLoginAt        DateTime? @map("last_login_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions Session[]
 
-  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Por eso un
-  // usuario se da de baja y no se borra: estas filas necesitan su autor.
+  // Lo que el usuario hizo o tiene a su cargo en los demás dominios. Con estas
+  // filas, la base no deja borrarlo (RESTRICT): se desactiva.
   assignedWorkOrders WorkOrder[]      @relation("WorkOrderMechanic")
   createdWorkOrders  WorkOrder[]      @relation("WorkOrderCreatedBy")
   workOrderEvents    WorkOrderEvent[]
@@ -51,39 +61,76 @@ enum UserRole {
   MECHANIC
 }
 
-/// Una sesión iniciada: el token de refresco con el que un usuario renueva su
-/// acceso sin volver a escribir la contraseña. Existe para poder revocar el
-/// acceso (cerrar sesión, dar de baja, detectar un token robado), cosa que un
-/// JWT por sí solo no permite.
+/// Una sesión iniciada: el token de refresco con el que un usuario o un
+/// cliente renueva su acceso sin volver a escribir la contraseña. Existe para
+/// poder revocar el acceso (cerrar sesión, dar de baja, detectar un token
+/// robado), cosa que un JWT por sí solo no permite.
 ///
 /// Cada refresco revoca la fila usada y crea otra en la misma familia. Si llega
 /// un token ya revocado, alguien lo copió: se revoca la familia entera.
 model Session {
-  sessionId    String    @id @default(uuid()) @map("session_id") @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
+  sessionId         String    @id @default(uuid()) @map("session_id") @db.Uuid
+  /// De quién es la sesión: un usuario del personal **o** la cuenta de un
+  /// cliente, nunca los dos ni ninguno. Lo asegura el CHECK
+  /// `core_session_owner_check` de la migración `acceso_al_portal`, que Prisma
+  /// no puede declarar.
+  userId            String?   @map("user_id") @db.Uuid
+  customerAccountId String?   @map("customer_account_id") @db.Uuid
   /// SHA-256 del token de refresco, en hexadecimal. El token nunca se guarda:
   /// si la base se filtra, estos hashes no sirven para entrar.
-  tokenHash    String    @unique @map("token_hash") @db.Char(64)
+  tokenHash         String    @unique @map("token_hash") @db.Char(64)
   /// Agrupa las sesiones que salen de un mismo inicio de sesión, una por cada
   /// refresco. Es lo que se revoca entero cuando se detecta un token reusado.
-  familyId     String    @map("family_id") @db.Uuid
-  expiresAt    DateTime  @map("expires_at")
+  familyId          String    @map("family_id") @db.Uuid
+  expiresAt         DateTime  @map("expires_at")
   /// Vacío mientras la sesión sirve. Se llena al refrescar, al cerrar sesión o
   /// al revocar la familia.
-  revokedAt    DateTime? @map("revoked_at")
+  revokedAt         DateTime? @map("revoked_at")
   /// La sesión que la reemplazó al refrescar. Vacío si se revocó por cierre de
   /// sesión o por reuso: distingue una rotación normal de un cierre.
-  replacedById String?   @map("replaced_by_id") @db.Uuid
+  replacedById      String?   @map("replaced_by_id") @db.Uuid
   /// Desde dónde se inició, para que el usuario reconozca sus sesiones.
-  ip           String?   @db.VarChar(45)
-  userAgent    String?   @map("user_agent")
+  ip                String?   @db.VarChar(45)
+  userAgent         String?   @map("user_agent")
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  // Cascade: las sesiones de un usuario no tienen sentido sin él.
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  // Cascade: las sesiones no tienen sentido sin su dueño. Quitar el acceso de
+  // un cliente (borrar su cuenta) las borra con ella.
+  user            User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [customerAccountId], onDelete: Cascade)
 
   @@index([userId])
+  @@index([customerAccountId])
   @@index([familyId])
   @@map("core_session")
+}
+
+/// Español: acceso al portal. La contraseña con la que un cliente entra a su
+/// portal. Existe solo si el administrador le habilitó el acceso; quitárselo es
+/// borrarla (y sus sesiones caen con ella). Está aparte de `Customer` para que
+/// el hash no viaje con cada consulta del cliente, y aparte de `User` porque un
+/// cliente no es personal del taller.
+model CustomerAccount {
+  customerAccountId  String    @id @default(uuid()) @map("customer_account_id") @db.Uuid
+  /// Una cuenta por cliente. Con ella entra por su número de documento o su
+  /// correo, los de `Customer`.
+  customerId         String    @unique @map("customer_id") @db.Uuid
+  /// Hash argon2id, igual que el del personal.
+  passwordHash       String    @map("password_hash")
+  /// Nace en true: la primera contraseña la genera el sistema y el
+  /// administrador se la comparte, así que el cliente tiene que cambiarla.
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
+  /// Hasta cuándo sirve la temporal. Vacío si la eligió el propio cliente.
+  passwordExpiresAt  DateTime? @map("password_expires_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Cascade: sin cliente no hay a quién darle acceso.
+  customer Customer  @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  sessions Session[]
+
+  @@map("core_customer_account")
 }

@@ -48,5 +48,22 @@ describe('AccessGuard', () => {
 
     await expect(guard.canActivate(testContext(request))).resolves.toBe(true);
     expect(request.user).toEqual({ userId: 'u1', role: 'MECHANIC' });
+    expect(request.customer).toBeUndefined();
+    // Un token sin la marca no está pendiente de cambiar la contraseña.
+    expect(request.mustChangePassword).toBe(false);
+  });
+
+  it('con el token de un cliente deja al cliente, nunca un usuario', async () => {
+    const token = await jwt.signAsync({
+      sub: 'c1',
+      role: 'CUSTOMER',
+      mustChangePassword: true,
+    });
+    const request: Record<string, unknown> = { cookies: { afm_access: token } };
+
+    await expect(guard.canActivate(testContext(request))).resolves.toBe(true);
+    expect(request.customer).toEqual({ customerId: 'c1' });
+    expect(request.user).toBeUndefined();
+    expect(request.mustChangePassword).toBe(true);
   });
 });

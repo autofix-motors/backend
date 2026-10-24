@@ -35,6 +35,28 @@ partida`). Las reglas y el glosario están en [`nomenclatura.md`](nomenclatura.m
 > Escribir el trailer de atribución y borrarlo después obliga a reescribir
 > commits y forzar el push de una rama que quizá ya esté en un PR.
 
+## Cómo se construye un módulo
+
+Reglas del equipo para cada módulo nuevo. Se cumplen sin preguntar.
+
+1. **Un módulo a la vez, backend y frontend juntos.** No se empieza el siguiente
+   hasta que quien dirige el proyecto lo prueba desde el frontend y aprueba que
+   funciona y que el diseño es adecuado. Construir varios a ciegas multiplica lo
+   que hay que rehacer si el primero tenía un error de enfoque.
+2. **Toda respuesta de la API usa `BaseResponseDto`**
+   (`backend/src/shared/dto/base-response.dto.ts`): los éxitos y también los
+   errores, con `{ success, message, data, error, statusCode, meta }`. El
+   frontend lee un solo formato y muestra `message` tal cual.
+3. **Todo listado lleva paginación, búsqueda y filtros.** La paginación va en
+   `meta` (`page`, `pageSize`, `total`, `totalPages`). Antes de construirlo se le
+   **proponen** a quien dirige el proyecto los campos de búsqueda y los filtros, y
+   él decide cuáles van (y puede sumar otros).
+4. **Eliminar es borrar de verdad** (hard delete), nunca marcar como borrado. Si
+   el registro tiene historial que lo referencia, la base lo impide (`RESTRICT`)
+   y la API responde **409 con un mensaje que diga por qué** («el cliente tiene
+   vehículos u órdenes registradas»). El historial nunca se borra en cascada.
+   `isActive`, donde existe, es un estado de operación (filtro), no un borrado.
+
 ## Antes de implementar
 
 - **Planificar por escrito** antes de tocar código: se escribe, se discute, y
