@@ -51,6 +51,15 @@ describe('DecideQuoteDto', () => {
     }
   });
 
+  it('el taller no puede registrar el canal PORTAL: ese lo usa solo el cliente', async () => {
+    expect(
+      (await check(DecideQuoteDto, { decision: 'APPROVED', channel: 'PORTAL' }))
+        .messages,
+    ).toEqual([
+      'Indica por dónde respondió el cliente: PHONE, WHATSAPP o IN_PERSON',
+    ]);
+  });
+
   it('el canal es uno de los tres', async () => {
     expect(
       (await check(DecideQuoteDto, { decision: 'REJECTED', channel: 'EMAIL' }))

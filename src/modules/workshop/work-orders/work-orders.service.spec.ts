@@ -705,4 +705,55 @@ describe('WorkOrdersService', () => {
       await expect(service.remove('wo-1')).rejects.toThrow(NotFoundException);
     });
   });
+  describe('portal del cliente', () => {
+    it('lista solo las órdenes del cliente: en curso o anteriores, las más nuevas primero', async () => {
+      prisma.workOrder.findMany.mockResolvedValue([]);
+      prisma.workOrder.count.mockResolvedValue(0);
+
+      await service.findAllForCustomer('cust-1', {
+        open: true,
+        vehicleId: 'veh-1',
+        page: 1,
+        pageSize: 10,
+      });
+      const open = prisma.workOrder.findMany.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+        orderBy: unknown;
+      };
+      expect(open.where).toEqual({
+        customerId: 'cust-1',
+        vehicleId: 'veh-1',
+        status: { notIn: ['DELIVERED', 'CANCELLED'] },
+      });
+      expect(open.orderBy).toEqual([
+        { receivedAt: 'desc' },
+        { workOrderId: 'asc' },
+      ]);
+
+      await service.findAllForCustomer('cust-1', {
+        open: false,
+        page: 1,
+        pageSize: 10,
+      });
+      const closed = prisma.workOrder.findMany.mock.calls[1][0] as {
+        where: Record<string, unknown>;
+      };
+      expect(closed.where).toMatchObject({
+        customerId: 'cust-1',
+        status: { in: ['DELIVERED', 'CANCELLED'] },
+      });
+    });
+
+    it('el detalle busca la orden con el cliente: una ajena es 404', async () => {
+      prisma.workOrder.findFirst.mockResolvedValue(null);
+      await expect(
+        service.findOneForCustomer('wo-1', 'cust-1'),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.workOrder.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workOrderId: 'wo-1', customerId: 'cust-1' },
+        }),
+      );
+    });
+  });
 });

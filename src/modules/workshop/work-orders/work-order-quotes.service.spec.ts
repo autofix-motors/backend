@@ -67,7 +67,7 @@ describe('WorkOrderQuotesService', () => {
   const prisma = {
     $transaction: vi.fn((work: (client: typeof tx) => unknown) => work(tx)),
   };
-  const workOrders = { findOne: vi.fn() };
+  const workOrders = { findOne: vi.fn(), findOneForCustomer: vi.fn() };
   const service = new WorkOrderQuotesService(
     prisma as unknown as PrismaService,
     workOrders as unknown as WorkOrdersService,
@@ -464,6 +464,135 @@ describe('WorkOrderQuotesService', () => {
           ADMIN,
         ),
       ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
+    });
+  });
+  describe('decideByCustomer', () => {
+    const waiting = (quotes: unknown[] = [quote()]) =>
+      order({ status: 'WAITING_APPROVAL', quotes });
+
+    beforeEach(() => {
+      workOrders.findOneForCustomer.mockResolvedValue(waiting());
+    });
+
+    it('busca la orden solo entre las del cliente', async () => {
+      await service.decideByCustomer(
+        'wo-1',
+        'q-2',
+        { decision: 'APPROVED' },
+        'cust-1',
+      );
+      expect(workOrders.findOneForCustomer).toHaveBeenCalledWith(
+        'wo-1',
+        'cust-1',
+      );
+      expect(workOrders.findOne).not.toHaveBeenCalled();
+    });
+
+    it('guarda el canal PORTAL sin autor, y el evento público sin autor', async () => {
+      await service.decideByCustomer(
+        'wo-1',
+        'q-2',
+        { decision: 'APPROVED', note: 'Adelante' },
+        'cust-1',
+      );
+      expect(tx.quote.updateMany).toHaveBeenCalledWith({
+        where: { quoteId: 'q-2', status: 'PENDING' },
+        data: {
+          status: 'APPROVED',
+          decidedById: null,
+          decidedAt: SENT_AT,
+          decisionChannel: 'PORTAL',
+          decisionNote: 'Adelante',
+        },
+      });
+      expect(tx.workOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            status: 'IN_PROGRESS',
+            events: {
+              create: {
+                status: 'IN_PROGRESS',
+                note: 'Presupuesto v2 aprobado por el cliente desde el portal',
+                isPublic: true,
+                createdById: null,
+                createdAt: SENT_AT,
+              },
+            },
+          },
+        }),
+      );
+    });
+
+    it('rechazado: la orden vuelve a diagnóstico', async () => {
+      await service.decideByCustomer(
+        'wo-1',
+        'q-2',
+        { decision: 'REJECTED' },
+        'cust-1',
+      );
+      expect(tx.workOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'DIAGNOSIS' }),
+        }),
+      );
+    });
+
+    it('una orden de otro cliente no existe (404 de findOneForCustomer)', async () => {
+      workOrders.findOneForCustomer.mockRejectedValue(
+        new NotFoundException('No se encontró la orden de trabajo'),
+      );
+      await expect(
+        service.decideByCustomer('wo-1', 'q-2', { decision: 'APPROVED' }, 'x'),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('con la respuesta ya registrada (por el taller), 409 y nada se escribe', async () => {
+      workOrders.findOneForCustomer.mockResolvedValue(
+        waiting([quote({ status: 'APPROVED' })]),
+      );
+      await expect(
+        service.decideByCustomer(
+          'wo-1',
+          'q-2',
+          { decision: 'REJECTED' },
+          'cust-1',
+        ),
+      ).rejects.toThrow(
+        new ConflictException('El presupuesto v2 ya se registró como aprobado'),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('si la orden ya no espera aprobación (la cancelaron), 409', async () => {
+      workOrders.findOneForCustomer.mockResolvedValue(
+        order({ status: 'CANCELLED', quotes: [quote()] }),
+      );
+      await expect(
+        service.decideByCustomer(
+          'wo-1',
+          'q-2',
+          { decision: 'APPROVED' },
+          'cust-1',
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('si el taller registró la respuesta entre medio, 409', async () => {
+      tx.quote.updateMany.mockResolvedValue({ count: 0 });
+      await expect(
+        service.decideByCustomer(
+          'wo-1',
+          'q-2',
+          { decision: 'APPROVED' },
+          'cust-1',
+        ),
+      ).rejects.toThrow(
+        new ConflictException(
+          'El presupuesto cambió mientras tanto: vuelve a cargar la orden',
+        ),
+      );
+      expect(tx.workOrder.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -213,4 +213,52 @@ describe('VehiclesService', () => {
     prisma.vehicle.findUnique.mockResolvedValue(null);
     await expect(service.remove('v1')).rejects.toThrow(NotFoundException);
   });
+
+  describe('portal del cliente', () => {
+    it('pagina solo los vehículos del cliente, con la búsqueda del personal', async () => {
+      prisma.vehicle.findMany.mockResolvedValue([]);
+      prisma.vehicle.count.mockResolvedValue(10);
+
+      const page = await service.findForCustomer('c1', {
+        search: 'abc-1',
+        page: 2,
+        pageSize: 9,
+      });
+
+      const where = vehiclesWhere({ customerId: 'c1', search: 'abc-1' });
+      expect(prisma.vehicle.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where,
+          orderBy: [{ plate: 'asc' }, { vehicleId: 'asc' }],
+          skip: 9,
+          take: 9,
+        }),
+      );
+      expect(prisma.vehicle.count).toHaveBeenCalledWith({ where });
+      expect(page.meta.totalPages).toBe(2);
+    });
+
+    it('sin búsqueda, igual filtra por el cliente', async () => {
+      prisma.vehicle.findMany.mockResolvedValue([]);
+      prisma.vehicle.count.mockResolvedValue(0);
+      await service.findForCustomer('c1', { page: 1, pageSize: 9 });
+      expect(prisma.vehicle.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ customerId: 'c1' }),
+        }),
+      );
+    });
+
+    it('un vehículo de otro cliente responde 404', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue(null);
+      await expect(service.findOneForCustomer('v1', 'c1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.vehicle.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { vehicleId: 'v1', customerId: 'c1' },
+        }),
+      );
+    });
+  });
 });
