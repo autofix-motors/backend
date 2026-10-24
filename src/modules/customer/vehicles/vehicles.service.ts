@@ -64,6 +64,40 @@ export class VehiclesService {
     return { items, meta: paginationMeta(query.page, query.pageSize, total) };
   }
 
+  /**
+   * Los vehículos de un cliente, para su portal, con la misma búsqueda que el
+   * listado del personal. Por placa, para que el orden no cambie entre visitas.
+   */
+  async findForCustomer(
+    customerId: string,
+    query: Pick<ListVehiclesQueryDto, 'search' | 'page' | 'pageSize'>,
+  ): Promise<Page<VehicleWithRelations>> {
+    const where = vehiclesWhere({ customerId, search: query.search });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.vehicle.findMany({
+        where,
+        include: WITH_RELATIONS,
+        orderBy: [{ plate: 'asc' }, { vehicleId: 'asc' }],
+        ...pageWindow(query.page, query.pageSize),
+      }),
+      this.prisma.vehicle.count({ where }),
+    ]);
+    return { items, meta: paginationMeta(query.page, query.pageSize, total) };
+  }
+
+  /** Un vehículo del cliente. Si es de otro, para él no existe: 404. */
+  async findOneForCustomer(
+    vehicleId: string,
+    customerId: string,
+  ): Promise<VehicleWithRelations> {
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: { vehicleId, customerId },
+      include: WITH_RELATIONS,
+    });
+    if (!vehicle) throw new NotFoundException(NOT_FOUND);
+    return vehicle;
+  }
+
   async findOne(vehicleId: string): Promise<VehicleWithRelations> {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { vehicleId },
