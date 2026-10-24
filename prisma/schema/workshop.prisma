@@ -117,14 +117,18 @@ model WorkOrderEvent {
   /// Si lo ve el cliente en la página pública. Una nota interna («el cliente
   /// discutió el precio») no sale del taller.
   isPublic         Boolean          @default(false) @map("is_public")
-  createdById      String           @map("created_by_id") @db.Uuid
+  /// Quién lo hizo. Vacío cuando fue el cliente desde su portal (el cliente
+  /// no es un usuario): hoy, al responder un presupuesto.
+  createdById      String?          @map("created_by_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   // Sin updatedAt: un evento no se edita.
 
   // Cascade: los eventos no tienen sentido sin su orden.
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
-  createdBy User      @relation(fields: [createdById], references: [userId])
+  // Restrict: un usuario con historial no se borra (se desactiva); que el
+  // autor sea opcional no lo cambia.
+  createdBy User?     @relation(fields: [createdById], references: [userId], onDelete: Restrict)
 
   @@index([workOrderId, createdAt])
   @@map("workshop_work_order_event")
@@ -195,7 +199,9 @@ model Quote {
   sentById        String           @map("sent_by_id") @db.Uuid
   sentAt          DateTime         @default(now()) @map("sent_at")
   /// El administrador que registró la respuesta del cliente. Vacío mientras
-  /// está PENDING; los cuatro campos de la decisión se llenan juntos.
+  /// está PENDING y cuando el cliente respondió desde su portal (canal
+  /// PORTAL): el cliente no es un usuario. Los campos de la decisión se llenan
+  /// juntos.
   decidedById     String?          @map("decided_by_id") @db.Uuid
   decidedAt       DateTime?        @map("decided_at")
   /// Por dónde respondió el cliente.
@@ -233,6 +239,9 @@ enum DecisionChannel {
   WHATSAPP
   /// Español: en persona, en el taller.
   IN_PERSON
+  /// Español: desde su portal. Lo registra el propio cliente, no el
+  /// administrador.
+  PORTAL
 }
 
 /// Español: ítem del presupuesto. Una foto de un ítem de la orden en el momento

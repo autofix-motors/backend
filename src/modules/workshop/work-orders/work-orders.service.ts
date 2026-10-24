@@ -8,7 +8,11 @@ import {
 import type { SessionUser } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import { UserRole, WorkOrderStatus } from '../../../generated/prisma/enums.js';
+import {
+  QuoteStatus,
+  UserRole,
+  WorkOrderStatus,
+} from '../../../generated/prisma/enums.js';
 import { fromDateColumn, toDateColumn } from '../../../shared/date-column.js';
 import { limaDayRange, limaToday } from '../../../shared/lima-dates.js';
 import {
@@ -84,6 +88,22 @@ export const WITH_TIMELINE = {
     orderBy: { version: 'desc' },
   },
 } satisfies Prisma.WorkOrderInclude;
+
+/**
+ * La orden del listado del portal: lo del listado más si hay un presupuesto
+ * esperando la respuesta del cliente (solo su id: lo demás está en el detalle).
+ */
+const WITH_PENDING_QUOTE = {
+  ...WITH_RELATIONS,
+  quotes: {
+    where: { status: QuoteStatus.PENDING },
+    select: { quoteId: true },
+  },
+} satisfies Prisma.WorkOrderInclude;
+
+export type WorkOrderWithPendingQuote = WorkOrderWithRelations & {
+  quotes: { quoteId: string }[];
+};
 
 const NOT_FOUND = 'No se encontró la orden de trabajo';
 const INACTIVE_CUSTOMER =
@@ -172,6 +192,55 @@ export class WorkOrdersService {
     if (!order || !canSee(order, actor)) {
       throw new NotFoundException(NOT_FOUND);
     }
+    return order;
+  }
+
+  /**
+   * Las órdenes que trajo un cliente, para su portal: en curso (`open`) o
+   * anteriores, las más recientes primero. Trae si tienen un presupuesto
+   * esperando su respuesta.
+   */
+  async findAllForCustomer(
+    customerId: string,
+    query: {
+      open: boolean;
+      vehicleId?: string;
+      page: number;
+      pageSize: number;
+    },
+  ): Promise<Page<WorkOrderWithPendingQuote>> {
+    const where: Prisma.WorkOrderWhereInput = {
+      customerId,
+      vehicleId: query.vehicleId,
+      status: query.open
+        ? { notIn: [...CLOSED_STATUSES] }
+        : { in: [...CLOSED_STATUSES] },
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.workOrder.findMany({
+        where,
+        include: WITH_PENDING_QUOTE,
+        orderBy: [{ receivedAt: 'desc' }, { workOrderId: 'asc' }],
+        ...pageWindow(query.page, query.pageSize),
+      }),
+      this.prisma.workOrder.count({ where }),
+    ]);
+    return { items, meta: paginationMeta(query.page, query.pageSize, total) };
+  }
+
+  /**
+   * Una orden del cliente, completa. Si no la trajo él, «no existe» (404),
+   * igual que para el mecánico: un 403 confirmaría que está ahí.
+   */
+  async findOneForCustomer(
+    workOrderId: string,
+    customerId: string,
+  ): Promise<WorkOrderWithTimeline> {
+    const order = await this.prisma.workOrder.findFirst({
+      where: { workOrderId, customerId },
+      include: WITH_TIMELINE,
+    });
+    if (!order) throw new NotFoundException(NOT_FOUND);
     return order;
   }
 

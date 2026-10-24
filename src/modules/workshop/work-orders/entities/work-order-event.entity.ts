@@ -7,7 +7,8 @@ import {
 } from './work-order-user.entity.js';
 
 export type WorkOrderEventWithAuthor = WorkOrderEventModel & {
-  createdBy: WorkOrderUserModel;
+  /** Vacío si lo hizo el cliente desde su portal. */
+  createdBy: WorkOrderUserModel | null;
 };
 
 /** Un evento de la línea de tiempo: un cambio de estado o una nota. */
@@ -17,7 +18,7 @@ export class WorkOrderEvent {
     this.status = event.status;
     this.note = event.note;
     this.isPublic = event.isPublic;
-    this.createdBy = new WorkOrderUser(event.createdBy);
+    this.createdBy = event.createdBy && new WorkOrderUser(event.createdBy);
     this.createdAt = event.createdAt;
   }
 
@@ -38,8 +39,12 @@ export class WorkOrderEvent {
   @ApiProperty({ description: 'Si el cliente lo ve en el seguimiento' })
   isPublic: boolean;
 
-  @ApiProperty({ type: WorkOrderUser })
-  createdBy: WorkOrderUser;
+  @ApiProperty({
+    type: WorkOrderUser,
+    nullable: true,
+    description: 'Vacío si lo hizo el cliente desde su portal',
+  })
+  createdBy: WorkOrderUser | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;

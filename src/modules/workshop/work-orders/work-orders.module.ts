@@ -26,5 +26,8 @@ import { WorkOrdersService } from './work-orders.service.js';
   ],
   controllers: [WorkOrdersController],
   providers: [WorkOrdersService, WorkOrderItemsService, WorkOrderQuotesService],
+  // El portal del cliente lee sus órdenes y registra su respuesta al
+  // presupuesto con estos services (invariante 3).
+  exports: [WorkOrdersService, WorkOrderQuotesService],
 })
 export class WorkOrdersModule {}

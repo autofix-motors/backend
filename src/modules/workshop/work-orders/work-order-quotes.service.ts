@@ -7,9 +7,12 @@ import {
 import type { SessionUser } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import { QuoteStatus } from '../../../generated/prisma/enums.js';
+import {
+  DecisionChannel,
+  QuoteStatus,
+} from '../../../generated/prisma/enums.js';
 import type { CreateQuoteDto } from './dto/create-quote.dto.js';
-import type { DecideQuoteDto } from './dto/decide-quote.dto.js';
+import type { DecideQuoteDto, QuoteDecision } from './dto/decide-quote.dto.js';
 import type { QuoteWithRelations } from './entities/quote.entity.js';
 import type { WorkOrderWithTimeline } from './entities/work-order-detail.entity.js';
 import {
@@ -42,15 +45,12 @@ const ALREADY_DECIDED: Record<
     `El presupuesto v${version} fue reemplazado por una versión más nueva`,
 };
 
-const DECISION_TRANSITION: Record<
-  DecideQuoteDto['decision'],
-  SystemTransition
-> = {
+const DECISION_TRANSITION: Record<QuoteDecision, SystemTransition> = {
   APPROVED: 'QUOTE_APPROVED',
   REJECTED: 'QUOTE_REJECTED',
 };
 
-const DECISION_TEXT: Record<DecideQuoteDto['decision'], string> = {
+const DECISION_TEXT: Record<QuoteDecision, string> = {
   APPROVED: 'aprobado',
   REJECTED: 'rechazado',
 };
@@ -176,10 +176,9 @@ export class WorkOrderQuotesService {
   }
 
   /**
-   * Registra la respuesta del cliente sobre la versión PENDING: aprobado lleva
-   * la orden a reparación; rechazado, de vuelta a diagnóstico. La decisión
-   * (quién, cuándo, por dónde y la nota) se guarda en el presupuesto y el
-   * cambio de estado queda en la línea de tiempo, público.
+   * Registra la respuesta del cliente sobre la versión PENDING, como la
+   * cuenta el administrador (por llamada, WhatsApp o en el taller): aprobado
+   * lleva la orden a reparación; rechazado, de vuelta a diagnóstico.
    */
   async decide(
     workOrderId: string,
@@ -188,47 +187,86 @@ export class WorkOrderQuotesService {
     actor: SessionUser,
   ): Promise<WorkOrderWithTimeline> {
     const order = await this.workOrders.findOne(workOrderId, actor);
-    const quote = findQuote(order, quoteId);
-    if (quote.status !== QuoteStatus.PENDING) {
-      throw new ConflictException(ALREADY_DECIDED[quote.status](quote.version));
-    }
-    const transition = DECISION_TRANSITION[dto.decision];
-    // Una versión pendiente en una orden que ya no espera (la cancelaron
-    // mientras esperaba): no hay respuesta que registrar.
-    if (!canApplySystemTransition(transition, order.status)) {
-      throw new ConflictException(
-        `La orden está en «${WORK_ORDER_STATUS_LABELS[order.status]}»: la respuesta del cliente se registra mientras espera aprobación`,
-      );
-    }
+    const quote = assertDecidable(order, quoteId, dto.decision);
+    return this.applyDecision(order, quote, {
+      decision: dto.decision,
+      channel: dto.channel,
+      note: dto.note ?? null,
+      decidedById: actor.userId,
+      eventNote: `Presupuesto v${quote.version} ${DECISION_TEXT[dto.decision]}`,
+    });
+  }
 
-    const { to } = SYSTEM_TRANSITIONS[transition];
+  /**
+   * La misma respuesta, dada por el propio cliente desde su portal. Solo
+   * sobre una orden suya (si no, 404) y sin autor: el cliente no es un
+   * usuario, así que el canal (PORTAL) dice quién respondió.
+   */
+  async decideByCustomer(
+    workOrderId: string,
+    quoteId: string,
+    input: { decision: QuoteDecision; note?: string | null },
+    customerId: string,
+  ): Promise<WorkOrderWithTimeline> {
+    const order = await this.workOrders.findOneForCustomer(
+      workOrderId,
+      customerId,
+    );
+    const quote = assertDecidable(order, quoteId, input.decision);
+    return this.applyDecision(order, quote, {
+      decision: input.decision,
+      channel: DecisionChannel.PORTAL,
+      note: input.note ?? null,
+      decidedById: null,
+      eventNote: `Presupuesto v${quote.version} ${DECISION_TEXT[input.decision]} por el cliente desde el portal`,
+    });
+  }
+
+  /**
+   * La decisión y el cambio de estado, en una transacción. La decisión
+   * (quién, cuándo, por dónde y la nota) se guarda en el presupuesto y el
+   * cambio de estado queda en la línea de tiempo, público.
+   */
+  private applyDecision(
+    order: WorkOrderWithTimeline,
+    quote: QuoteWithRelations,
+    decision: {
+      decision: QuoteDecision;
+      channel: DecisionChannel;
+      note: string | null;
+      /** Vacío cuando respondió el cliente desde su portal. */
+      decidedById: string | null;
+      eventNote: string;
+    },
+  ): Promise<WorkOrderWithTimeline> {
+    const { to } = SYSTEM_TRANSITIONS[DECISION_TRANSITION[decision.decision]];
     const decidedAt = new Date();
     return this.prisma.$transaction(async (tx) => {
       // Con PENDING en el `where`: si otro registró la respuesta entre medio,
       // no se pisa.
       const { count } = await tx.quote.updateMany({
-        where: { quoteId, status: QuoteStatus.PENDING },
+        where: { quoteId: quote.quoteId, status: QuoteStatus.PENDING },
         data: {
-          status: dto.decision,
-          decidedById: actor.userId,
+          status: decision.decision,
+          decidedById: decision.decidedById,
           decidedAt,
-          decisionChannel: dto.channel,
-          decisionNote: dto.note ?? null,
+          decisionChannel: decision.channel,
+          decisionNote: decision.note,
         },
       });
       if (count === 0) throw new ConflictException(STALE_QUOTE);
 
       return unlessStale(
         tx.workOrder.update({
-          where: { workOrderId, status: order.status },
+          where: { workOrderId: order.workOrderId, status: order.status },
           data: {
             status: to,
             events: {
               create: {
                 status: to,
-                note: `Presupuesto v${quote.version} ${DECISION_TEXT[dto.decision]}`,
+                note: decision.eventNote,
                 isPublic: true,
-                createdById: actor.userId,
+                createdById: decision.decidedById,
                 createdAt: decidedAt,
               },
             },
@@ -238,6 +276,29 @@ export class WorkOrderQuotesService {
       );
     });
   }
+}
+
+/**
+ * La versión a responder, si se puede: tiene que ser de esta orden (si no,
+ * 404), estar PENDING y la orden seguir esperando aprobación (si no, 409).
+ */
+function assertDecidable(
+  order: WorkOrderWithTimeline,
+  quoteId: string,
+  decision: QuoteDecision,
+): QuoteWithRelations {
+  const quote = findQuote(order, quoteId);
+  if (quote.status !== QuoteStatus.PENDING) {
+    throw new ConflictException(ALREADY_DECIDED[quote.status](quote.version));
+  }
+  // Una versión pendiente en una orden que ya no espera (la cancelaron
+  // mientras esperaba): no hay respuesta que registrar.
+  if (!canApplySystemTransition(DECISION_TRANSITION[decision], order.status)) {
+    throw new ConflictException(
+      `La orden está en «${WORK_ORDER_STATUS_LABELS[order.status]}»: la respuesta del cliente se registra mientras espera aprobación`,
+    );
+  }
+  return quote;
 }
 
 /**
