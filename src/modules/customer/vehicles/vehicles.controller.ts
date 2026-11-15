@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -33,7 +33,7 @@ import { VehiclesService } from './vehicles.service.js';
 
 /** Los vehículos de los clientes. Solo el administrador los gestiona. */
 @ApiTags('vehicles')
-@Roles(UserRole.ADMIN)
+@Roles(RolUsuario.ADMINISTRADOR)
 @Controller('vehicles')
 export class VehiclesController {
   constructor(private readonly vehicles: VehiclesService) {}
@@ -67,10 +67,10 @@ export class VehiclesController {
   @ApiBaseResponse(Vehicle)
   @ApiNotFoundResponse({ description: 'No se encontró el vehículo' })
   async findOne(
-    @Param('vehicleId', ParseIdPipe) vehicleId: string,
+    @Param('vehicleId', ParseIdPipe) vehiculoId: string,
   ): Promise<BaseResponseDto<Vehicle>> {
     return BaseResponseDto.success(
-      new Vehicle(await this.vehicles.findOne(vehicleId)),
+      new Vehicle(await this.vehicles.findOne(vehiculoId)),
       'Vehículo obtenido',
     );
   }
@@ -102,11 +102,11 @@ export class VehiclesController {
     description: 'Ya existe un vehículo con esa placa o ese VIN',
   })
   async update(
-    @Param('vehicleId', ParseIdPipe) vehicleId: string,
+    @Param('vehicleId', ParseIdPipe) vehiculoId: string,
     @Body() dto: UpdateVehicleDto,
   ): Promise<BaseResponseDto<Vehicle>> {
     return BaseResponseDto.success(
-      new Vehicle(await this.vehicles.update(vehicleId, dto)),
+      new Vehicle(await this.vehicles.update(vehiculoId, dto)),
       'Vehículo actualizado',
     );
   }
@@ -119,9 +119,9 @@ export class VehiclesController {
     description: 'El vehículo tiene órdenes de trabajo registradas',
   })
   async remove(
-    @Param('vehicleId', ParseIdPipe) vehicleId: string,
+    @Param('vehicleId', ParseIdPipe) vehiculoId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.vehicles.remove(vehicleId);
+    await this.vehicles.remove(vehiculoId);
     return BaseResponseDto.success(null, 'Vehículo eliminado');
   }
 }

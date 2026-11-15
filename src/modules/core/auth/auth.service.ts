@@ -7,10 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { normalizeLoginIdentifier } from '../../../core/auth/login-identifier.js';
-import {
-  hashPassword,
-  verifyPassword,
-} from '../../../core/auth/passwords.js';
+import { hashPassword, verifyPassword } from '../../../core/auth/passwords.js';
 import {
   CUSTOMER_ROLE,
   type AccessPayload,
@@ -18,9 +15,10 @@ import {
 } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import type {
-  CustomerAccount,
-  User,
+  CuentaCliente,
+  Usuario,
 } from '../../../generated/prisma/client.js';
+import { TipoDocumento } from '../../../generated/prisma/enums.js';
 import { CustomersService } from '../../customer/customers/customers.service.js';
 import { CustomerAccountsService } from '../customer-accounts/customer-accounts.service.js';
 import {
@@ -28,13 +26,15 @@ import {
   type SessionOrigin,
   type SessionOwner,
 } from '../sessions/sessions.service.js';
+import { UsersService } from '../users/users.service.js';
 import type { CurrentSessionModel } from './entities/current-session.entity.js';
+import type { ProfileModel } from './entities/profile.entity.js';
 
 /** Lo que el controlador necesita para responder y poner las cookies. */
 export interface SessionResult {
-  session: CurrentSessionModel;
-  accessToken: string;
-  refreshToken: string;
+  sesion: CurrentSessionModel;
+  tokenAcceso: string;
+  tokenRefresco: string;
 }
 
 const INVALID_CREDENTIALS = 'Usuario o contraseña incorrectos';
@@ -49,11 +49,15 @@ const NO_PORTAL_ACCESS = 'Ya no tienes acceso al portal';
 
 /** Quien inició sesión, ya leído de la base. */
 type Account =
-  | { kind: 'staff'; user: User }
+  | { tipo: 'personal'; usuario: Usuario }
   | {
-      kind: 'customer';
-      account: CustomerAccount;
-      customer: { name: string; email: string | null; documentNumber: string };
+      tipo: 'cliente';
+      cuenta: CuentaCliente;
+      cliente: {
+        nombre: string;
+        correo: string | null;
+        numeroDocumento: string;
+      };
     };
 
 @Injectable()
@@ -70,6 +74,7 @@ export class AuthService implements OnModuleInit {
     private readonly sessions: SessionsService,
     private readonly customerAccounts: CustomerAccountsService,
     private readonly customers: CustomersService,
+    private readonly users: UsersService,
   ) {}
 
   async onModuleInit() {
@@ -83,30 +88,30 @@ export class AuthService implements OnModuleInit {
     origin: SessionOrigin,
   ): Promise<SessionResult> {
     const identifier = normalizeLoginIdentifier(rawIdentifier);
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.usuario.findUnique({
       where:
-        identifier.kind === 'email'
-          ? { email: identifier.value }
-          : { documentNumber: identifier.value },
+        identifier.tipo === 'correo'
+          ? { correo: identifier.valor }
+          : { numeroDocumento: identifier.valor },
     });
 
     const isValid = await verifyPassword(
-      user?.passwordHash ?? this.dummyHash,
+      user?.hashContrasena ?? this.dummyHash,
       password,
     );
-    if (!user?.passwordHash || !isValid) {
+    if (!user?.hashContrasena || !isValid) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
     // Se dice recién después de validar la contraseña: a quien no la conoce no
     // se le confirma que la cuenta existe.
-    if (!user.isActive) throw new UnauthorizedException(USER_INACTIVE);
+    if (!user.activo) throw new UnauthorizedException(USER_INACTIVE);
     assertTemporaryNotExpired(user);
 
-    await this.prisma.user.update({
-      where: { userId: user.userId },
-      data: { lastLoginAt: new Date() },
+    await this.prisma.usuario.update({
+      where: { usuarioId: user.usuarioId },
+      data: { ultimoIngresoEn: new Date() },
     });
-    return this.open({ kind: 'staff', user }, origin);
+    return this.open({ tipo: 'personal', usuario: user }, origin);
   }
 
   /**
@@ -130,7 +135,7 @@ export class AuthService implements OnModuleInit {
 
     const matches = [];
     for (const candidate of candidates) {
-      if (await verifyPassword(candidate.passwordHash, password)) {
+      if (await verifyPassword(candidate.hashContrasena, password)) {
         matches.push(candidate);
       }
     }
@@ -140,32 +145,35 @@ export class AuthService implements OnModuleInit {
     if (matches.length > 1) throw new UnauthorizedException(AMBIGUOUS);
 
     const [account] = matches;
-    if (!account.customer.isActive) {
+    if (!account.cliente.activo) {
       throw new UnauthorizedException(CUSTOMER_INACTIVE);
     }
     assertTemporaryNotExpired(account);
 
-    await this.customerAccounts.recordLogin(account.customerAccountId);
-    const customer = await this.customers.findOne(account.customerId);
-    return this.open({ kind: 'customer', account, customer }, origin);
+    await this.customerAccounts.recordLogin(account.cuentaClienteId);
+    const customer = await this.customers.findOne(account.clienteId);
+    return this.open(
+      { tipo: 'cliente', cuenta: account, cliente: customer },
+      origin,
+    );
   }
 
   async refresh(token: string, origin: SessionOrigin): Promise<SessionResult> {
     const rotated = await this.sessions.rotate(token, origin);
     let account: Account;
     try {
-      account = await this.loadOwner(rotated.owner);
+      account = await this.loadOwner(rotated.dueno);
     } catch (error) {
       // Aquí es donde un usuario dado de baja o un cliente sin acceso pierde la
       // sesión: su JWT vigente dura como máximo ACCESS_TOKEN_MINUTES, pero ya
       // no puede renovarlo.
-      await this.sessions.revokeFamily(rotated.familyId);
+      await this.sessions.revokeFamily(rotated.familiaId);
       throw error;
     }
     return {
-      session: sessionModel(account),
-      accessToken: await this.signAccessToken(account),
-      refreshToken: rotated.token,
+      sesion: sessionModel(account),
+      tokenAcceso: await this.signAccessToken(account),
+      tokenRefresco: rotated.token,
     };
   }
 
@@ -179,53 +187,102 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * Los datos de quien llama, para «Mi perfil». Se leen por el service dueño
+   * de cada tabla (invariante 3) y con las mismas reglas que la sesión: un
+   * usuario dado de baja o un cliente sin acceso no ve su perfil aunque su
+   * JWT siga vigente.
+   */
+  async getProfile(principal: SessionPrincipal): Promise<ProfileModel> {
+    if (principal.tipo === 'personal') {
+      const user = await this.users.findOne(principal.usuarioId);
+      if (!user.activo) throw new UnauthorizedException(USER_INACTIVE);
+      return {
+        tipo: 'PERSONAL',
+        nombre: user.nombre,
+        correo: user.correo,
+        telefono: user.telefono,
+        // El documento del personal es siempre un DNI (8 dígitos).
+        tipoDocumento: user.numeroDocumento ? TipoDocumento.DNI : null,
+        numeroDocumento: user.numeroDocumento,
+        rol: user.rol,
+        direccion: null,
+        ultimoIngresoEn: user.ultimoIngresoEn,
+        miembroDesde: user.creadoEn,
+      };
+    }
+
+    const account = await this.customerAccounts.findByCustomerId(
+      principal.clienteId,
+    );
+    if (!account) throw new UnauthorizedException(NO_PORTAL_ACCESS);
+    const customer = await this.customers.findOne(principal.clienteId);
+    if (!customer.activo) throw new UnauthorizedException(CUSTOMER_INACTIVE);
+    return {
+      tipo: 'CLIENTE',
+      nombre: customer.nombre,
+      correo: customer.correo,
+      telefono: customer.telefono,
+      tipoDocumento: customer.tipoDocumento,
+      numeroDocumento: customer.numeroDocumento,
+      rol: CUSTOMER_ROLE,
+      direccion: customer.direccion,
+      // El último ingreso es al portal, que es lo que la cuenta registra.
+      ultimoIngresoEn: account.ultimoIngresoEn,
+      // Cliente del taller desde que se registró, no desde que tiene acceso.
+      miembroDesde: customer.creadoEn,
+    };
+  }
+
+  /**
    * Cambia la propia contraseña. Deja de ser temporal, se cierran todas las
    * sesiones (la contraseña anterior pudo filtrarse) y se abre una nueva para
    * quien la cambió, con un JWT sin la marca de cambio pendiente.
    */
   async changeOwnPassword(
     principal: SessionPrincipal,
-    currentPassword: string,
-    newPassword: string,
+    contrasenaActual: string,
+    contrasenaNueva: string,
     origin: SessionOrigin,
   ): Promise<SessionResult> {
     const account = await this.loadPrincipal(principal);
     const hash =
-      account.kind === 'staff'
-        ? account.user.passwordHash
-        : account.account.passwordHash;
-    if (!hash || !(await verifyPassword(hash, currentPassword))) {
+      account.tipo === 'personal'
+        ? account.usuario.hashContrasena
+        : account.cuenta.hashContrasena;
+    if (!hash || !(await verifyPassword(hash, contrasenaActual))) {
       throw new BadRequestException('La contraseña actual no es correcta');
     }
-    if (newPassword === currentPassword) {
+    if (contrasenaNueva === contrasenaActual) {
       throw new BadRequestException(
         'La contraseña nueva tiene que ser distinta de la actual',
       );
     }
-    if (loginIdentifiers(account).includes(newPassword.trim().toLowerCase())) {
+    if (
+      loginIdentifiers(account).includes(contrasenaNueva.trim().toLowerCase())
+    ) {
       throw new BadRequestException(
         'La contraseña no puede ser tu documento ni tu correo',
       );
     }
 
-    const newHash = await hashPassword(newPassword);
+    const newHash = await hashPassword(contrasenaNueva);
     let updated: Account;
-    if (account.kind === 'staff') {
-      const user = await this.prisma.user.update({
-        where: { userId: account.user.userId },
+    if (account.tipo === 'personal') {
+      const user = await this.prisma.usuario.update({
+        where: { usuarioId: account.usuario.usuarioId },
         data: {
-          passwordHash: newHash,
-          mustChangePassword: false,
-          passwordExpiresAt: null,
+          hashContrasena: newHash,
+          debeCambiarContrasena: false,
+          contrasenaExpiraEn: null,
         },
       });
-      updated = { kind: 'staff', user };
+      updated = { tipo: 'personal', usuario: user };
     } else {
       const customerAccount = await this.customerAccounts.setOwnPassword(
-        account.account.customerAccountId,
+        account.cuenta.cuentaClienteId,
         newHash,
       );
-      updated = { ...account, account: customerAccount };
+      updated = { ...account, cuenta: customerAccount };
     }
 
     await this.sessions.revokeAll(owner(updated));
@@ -237,23 +294,23 @@ export class AuthService implements OnModuleInit {
     origin: SessionOrigin,
   ): Promise<SessionResult> {
     return {
-      session: sessionModel(account),
-      accessToken: await this.signAccessToken(account),
-      refreshToken: await this.sessions.create(owner(account), origin),
+      sesion: sessionModel(account),
+      tokenAcceso: await this.signAccessToken(account),
+      tokenRefresco: await this.sessions.create(owner(account), origin),
     };
   }
 
   /** El dueño de una sesión que se renueva, si todavía puede entrar. */
   private async loadOwner(sessionOwner: SessionOwner): Promise<Account> {
-    if ('userId' in sessionOwner) {
-      const user = await this.prisma.user.findUnique({
-        where: { userId: sessionOwner.userId },
+    if ('usuarioId' in sessionOwner) {
+      const user = await this.prisma.usuario.findUnique({
+        where: { usuarioId: sessionOwner.usuarioId },
       });
-      if (!user?.isActive) throw new UnauthorizedException(USER_INACTIVE);
-      return { kind: 'staff', user };
+      if (!user?.activo) throw new UnauthorizedException(USER_INACTIVE);
+      return { tipo: 'personal', usuario: user };
     }
     const account = await this.customerAccounts.findById(
-      sessionOwner.customerAccountId,
+      sessionOwner.cuentaClienteId,
     );
     if (!account) throw new UnauthorizedException(NO_PORTAL_ACCESS);
     return this.customerAccount(account);
@@ -261,36 +318,36 @@ export class AuthService implements OnModuleInit {
 
   /** Quien llama con un JWT vigente, si todavía puede entrar. */
   private async loadPrincipal(principal: SessionPrincipal): Promise<Account> {
-    if (principal.kind === 'staff') {
-      return this.loadOwner({ userId: principal.userId });
+    if (principal.tipo === 'personal') {
+      return this.loadOwner({ usuarioId: principal.usuarioId });
     }
     const account = await this.customerAccounts.findByCustomerId(
-      principal.customerId,
+      principal.clienteId,
     );
     if (!account) throw new UnauthorizedException(NO_PORTAL_ACCESS);
     return this.customerAccount(account);
   }
 
-  private async customerAccount(account: CustomerAccount): Promise<Account> {
-    const customer = await this.customers.findOne(account.customerId);
-    if (!customer.isActive) {
+  private async customerAccount(account: CuentaCliente): Promise<Account> {
+    const customer = await this.customers.findOne(account.clienteId);
+    if (!customer.activo) {
       throw new UnauthorizedException(CUSTOMER_INACTIVE);
     }
-    return { kind: 'customer', account, customer };
+    return { tipo: 'cliente', cuenta: account, cliente: customer };
   }
 
   private signAccessToken(account: Account): Promise<string> {
     const payload: AccessPayload =
-      account.kind === 'staff'
+      account.tipo === 'personal'
         ? {
-            sub: account.user.userId,
-            role: account.user.role,
-            mustChangePassword: account.user.mustChangePassword,
+            sub: account.usuario.usuarioId,
+            rol: account.usuario.rol,
+            debeCambiarContrasena: account.usuario.debeCambiarContrasena,
           }
         : {
-            sub: account.account.customerId,
-            role: CUSTOMER_ROLE,
-            mustChangePassword: account.account.mustChangePassword,
+            sub: account.cuenta.clienteId,
+            rol: CUSTOMER_ROLE,
+            debeCambiarContrasena: account.cuenta.debeCambiarContrasena,
           };
     const minutes = this.config.getOrThrow<number>('ACCESS_TOKEN_MINUTES');
     return this.jwt.signAsync(payload, { expiresIn: minutes * 60 });
@@ -302,50 +359,50 @@ export class AuthService implements OnModuleInit {
  * la contraseña, como el estado de la cuenta.
  */
 function assertTemporaryNotExpired(account: {
-  mustChangePassword: boolean;
-  passwordExpiresAt: Date | null;
+  debeCambiarContrasena: boolean;
+  contrasenaExpiraEn: Date | null;
 }): void {
   if (
-    account.mustChangePassword &&
-    account.passwordExpiresAt &&
-    account.passwordExpiresAt <= new Date()
+    account.debeCambiarContrasena &&
+    account.contrasenaExpiraEn &&
+    account.contrasenaExpiraEn <= new Date()
   ) {
     throw new UnauthorizedException(EXPIRED_TEMPORARY);
   }
 }
 
 function owner(account: Account): SessionOwner {
-  return account.kind === 'staff'
-    ? { userId: account.user.userId }
-    : { customerAccountId: account.account.customerAccountId };
+  return account.tipo === 'personal'
+    ? { usuarioId: account.usuario.usuarioId }
+    : { cuentaClienteId: account.cuenta.cuentaClienteId };
 }
 
 /** Con qué entra: la contraseña no puede ser ninguno de estos. */
 function loginIdentifiers(account: Account): string[] {
   const values =
-    account.kind === 'staff'
-      ? [account.user.email, account.user.documentNumber]
-      : [account.customer.email, account.customer.documentNumber];
+    account.tipo === 'personal'
+      ? [account.usuario.correo, account.usuario.numeroDocumento]
+      : [account.cliente.correo, account.cliente.numeroDocumento];
   return values.filter((v): v is string => !!v).map((v) => v.toLowerCase());
 }
 
 function sessionModel(account: Account): CurrentSessionModel {
-  if (account.kind === 'staff') {
+  if (account.tipo === 'personal') {
     return {
-      role: account.user.role,
-      name: account.user.name,
-      email: account.user.email,
-      mustChangePassword: account.user.mustChangePassword,
-      userId: account.user.userId,
-      customerId: null,
+      rol: account.usuario.rol,
+      nombre: account.usuario.nombre,
+      correo: account.usuario.correo,
+      debeCambiarContrasena: account.usuario.debeCambiarContrasena,
+      usuarioId: account.usuario.usuarioId,
+      clienteId: null,
     };
   }
   return {
-    role: CUSTOMER_ROLE,
-    name: account.customer.name,
-    email: account.customer.email,
-    mustChangePassword: account.account.mustChangePassword,
-    userId: null,
-    customerId: account.account.customerId,
+    rol: CUSTOMER_ROLE,
+    nombre: account.cliente.nombre,
+    correo: account.cliente.correo,
+    debeCambiarContrasena: account.cuenta.debeCambiarContrasena,
+    usuarioId: null,
+    clienteId: account.cuenta.clienteId,
   };
 }

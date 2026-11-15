@@ -48,7 +48,7 @@ class VehicleYearInRange implements ValidatorConstraintInterface {
 export class CreateVehicleDto {
   @ApiProperty({ format: 'uuid', description: 'El dueño actual' })
   @IsUUID('4', { message: 'Selecciona el cliente' })
-  customerId: string;
+  clienteId: string;
 
   @ApiProperty({
     example: 'ABC123',
@@ -61,21 +61,21 @@ export class CreateVehicleDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa la placa' })
-  plate: string;
+  placa: string;
 
   @ApiProperty({ example: 'Toyota', maxLength: 60 })
   @Transform(trim)
   @MaxLength(60, { message: 'La marca tiene como máximo 60 caracteres' })
   @IsNotEmpty({ message: 'Ingresa la marca' })
   @IsString({ message: 'Ingresa la marca' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 'Yaris', maxLength: 60 })
   @Transform(trim)
   @MaxLength(60, { message: 'El modelo tiene como máximo 60 caracteres' })
   @IsNotEmpty({ message: 'Ingresa el modelo' })
   @IsString({ message: 'Ingresa el modelo' })
-  model: string;
+  modelo: string;
 
   @ApiPropertyOptional({
     type: Number,
@@ -87,7 +87,7 @@ export class CreateVehicleDto {
   @IsOptional()
   @Validate(VehicleYearInRange)
   @IsInt({ message: 'El año tiene que ser un número entero' })
-  year?: number | null;
+  anio?: number | null;
 
   @ApiPropertyOptional({
     type: String,
@@ -122,5 +122,5 @@ export class CreateVehicleDto {
   @TrimToNull()
   @MaxLength(1000, { message: 'Las notas tienen como máximo 1000 caracteres' })
   @IsString({ message: 'Las notas tienen que ser texto' })
-  notes?: string | null;
+  notas?: string | null;
 }

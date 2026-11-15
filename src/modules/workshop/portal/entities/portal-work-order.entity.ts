@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  QuoteStatus,
-  WorkOrderStatus,
+  EstadoPresupuesto,
+  EstadoOrden,
 } from '../../../../generated/prisma/enums.js';
 import { fromDateColumn } from '../../../../shared/date-column.js';
 import type { WorkOrderWithRelations } from '../../work-orders/entities/work-order.entity.js';
@@ -9,9 +9,9 @@ import { workOrderAmounts } from '../../work-orders/work-order-totals.js';
 import { PortalWorkOrderVehicle } from './portal-work-order-vehicle.entity.js';
 
 /** Lo que trae una orden para el listado del portal. */
-export type PortalWorkOrderModel = Omit<WorkOrderWithRelations, 'items'> & {
-  items: WorkOrderWithRelations['items'];
-  quotes: { quoteId: string; status?: QuoteStatus }[];
+export type PortalWorkOrderModel = Omit<WorkOrderWithRelations, 'detalles'> & {
+  detalles: WorkOrderWithRelations['detalles'];
+  presupuestos: { presupuestoId: string; estado?: EstadoPresupuesto }[];
 };
 
 /**
@@ -21,43 +21,44 @@ export type PortalWorkOrderModel = Omit<WorkOrderWithRelations, 'items'> & {
  */
 export class PortalWorkOrder {
   constructor(order: PortalWorkOrderModel) {
-    this.workOrderId = order.workOrderId;
-    this.trackingCode = order.trackingCode;
-    this.status = order.status;
-    this.reason = order.reason;
-    this.vehicle = new PortalWorkOrderVehicle(order.vehicle);
-    this.receivedAt = order.receivedAt;
-    this.promisedDate =
-      order.promisedDate && fromDateColumn(order.promisedDate);
-    this.deliveredAt = order.deliveredAt;
-    this.total = workOrderAmounts(order.items).total.toFixed(2);
+    this.ordenTrabajoId = order.ordenTrabajoId;
+    this.codigoSeguimiento = order.codigoSeguimiento;
+    this.estado = order.estado;
+    this.motivo = order.motivo;
+    this.vehiculo = new PortalWorkOrderVehicle(order.vehiculo);
+    this.recibidaEn = order.recibidaEn;
+    this.fechaPrometida =
+      order.fechaPrometida && fromDateColumn(order.fechaPrometida);
+    this.entregadaEn = order.entregadaEn;
+    this.total = workOrderAmounts(order.detalles).total.toFixed(2);
     // Solo cuenta mientras la orden espera: una versión que quedó pendiente
     // en una orden cancelada ya no se responde.
-    this.hasPendingQuote =
-      order.status === WorkOrderStatus.WAITING_APPROVAL &&
-      order.quotes.some(
-        (quote) =>
-          (quote.status ?? QuoteStatus.PENDING) === QuoteStatus.PENDING,
+    this.tienePresupuestoPendiente =
+      order.estado === EstadoOrden.ESPERANDO_APROBACION &&
+      order.presupuestos.some(
+        (presupuesto) =>
+          (presupuesto.estado ?? EstadoPresupuesto.PENDIENTE) ===
+          EstadoPresupuesto.PENDIENTE,
       );
   }
 
   @ApiProperty({ format: 'uuid' })
-  workOrderId: string;
+  ordenTrabajoId: string;
 
   @ApiProperty({ example: 'AFM-7K3Q9X', description: 'Código de seguimiento' })
-  trackingCode: string;
+  codigoSeguimiento: string;
 
-  @ApiProperty({ enum: WorkOrderStatus, enumName: 'WorkOrderStatus' })
-  status: WorkOrderStatus;
+  @ApiProperty({ enum: EstadoOrden, enumName: 'EstadoOrden' })
+  estado: EstadoOrden;
 
   @ApiProperty({ example: 'Ruido al frenar' })
-  reason: string;
+  motivo: string;
 
   @ApiProperty({ type: PortalWorkOrderVehicle })
-  vehicle: PortalWorkOrderVehicle;
+  vehiculo: PortalWorkOrderVehicle;
 
   @ApiProperty({ format: 'date-time' })
-  receivedAt: Date;
+  recibidaEn: Date;
 
   @ApiProperty({
     type: String,
@@ -65,10 +66,10 @@ export class PortalWorkOrder {
     nullable: true,
     example: '2026-10-20',
   })
-  promisedDate: string | null;
+  fechaPrometida: string | null;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  deliveredAt: Date | null;
+  entregadaEn: Date | null;
 
   @ApiProperty({ example: '450.00', description: 'En soles' })
   total: string;
@@ -76,5 +77,5 @@ export class PortalWorkOrder {
   @ApiProperty({
     description: 'Hay un presupuesto esperando su respuesta',
   })
-  hasPendingQuote: boolean;
+  tienePresupuestoPendiente: boolean;
 }

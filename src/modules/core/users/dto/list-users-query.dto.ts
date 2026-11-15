@@ -1,10 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsIn, IsOptional } from 'class-validator';
-import { UserRole } from '../../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../../generated/prisma/enums.js';
 import { PaginationQueryDto } from '../../../../shared/dto/pagination-query.dto.js';
 
-export const USER_SORT_FIELDS = ['name', 'createdAt', 'lastLoginAt'] as const;
+export const USER_SORT_FIELDS = [
+  'nombre',
+  'creadoEn',
+  'ultimoIngresoEn',
+] as const;
 export type UserSortField = (typeof USER_SORT_FIELDS)[number];
 
 /**
@@ -12,10 +16,10 @@ export type UserSortField = (typeof USER_SORT_FIELDS)[number];
  * los filtros son el rol y el estado.
  */
 export class ListUsersQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: UserRole, enumName: 'UserRole' })
+  @ApiPropertyOptional({ enum: RolUsuario, enumName: 'RolUsuario' })
   @IsOptional()
-  @IsEnum(UserRole, { message: 'El rol es ADMIN o MECHANIC' })
-  role?: UserRole;
+  @IsEnum(RolUsuario, { message: 'El rol es ADMINISTRADOR o MECANICO' })
+  rol?: RolUsuario;
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
@@ -24,17 +28,17 @@ export class ListUsersQueryDto extends PaginationQueryDto {
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean({ message: 'El estado es true o false' })
-  isActive?: boolean;
+  activo?: boolean;
 
-  @ApiPropertyOptional({ enum: USER_SORT_FIELDS, default: 'name' })
+  @ApiPropertyOptional({ enum: USER_SORT_FIELDS, default: 'nombre' })
   @IsOptional()
   @IsIn(USER_SORT_FIELDS, {
-    message: 'Se ordena por name, createdAt o lastLoginAt',
+    message: 'Se ordena por nombre, creadoEn o ultimoIngresoEn',
   })
-  sortBy: UserSortField = 'name';
+  ordenarPor: UserSortField = 'nombre';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   @IsOptional()
-  @IsIn(['asc', 'desc'], { message: 'El orden es asc o desc' })
-  sortOrder: 'asc' | 'desc' = 'asc';
+  @IsIn(['asc', 'desc'], { message: 'El sentido es asc o desc' })
+  sentido: 'asc' | 'desc' = 'asc';
 }

@@ -6,7 +6,9 @@ import type { PrismaService } from '../../../core/database/prisma/prisma.service
 import type { CustomersService } from '../../customer/customers/customers.service.js';
 import type { CustomerAccountsService } from '../customer-accounts/customer-accounts.service.js';
 import type { SessionsService } from '../sessions/sessions.service.js';
+import type { UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
+import { Profile } from './entities/profile.entity.js';
 
 // Lo que se prueba es lo que decide: qué credenciales entran, por qué dato,
 // qué mensaje sale en cada caso, que un dato inexistente no se distinga de uno
@@ -14,46 +16,46 @@ import { AuthService } from './auth.service.js';
 
 const PASSWORD = 'contrasena-correcta';
 const INVALID = new UnauthorizedException('Usuario o contraseña incorrectos');
-let passwordHash = '';
+let hashContrasena = '';
 
 function user(overrides: Record<string, unknown> = {}) {
   return {
-    userId: 'u1',
-    email: 'ana@taller.local',
-    documentNumber: '45678912',
-    name: 'Ana',
-    isActive: true,
-    passwordHash,
-    role: 'MECHANIC',
-    mustChangePassword: false,
-    passwordExpiresAt: null,
+    usuarioId: 'u1',
+    correo: 'ana@taller.local',
+    numeroDocumento: '45678912',
+    nombre: 'Ana',
+    activo: true,
+    hashContrasena,
+    rol: 'MECANICO',
+    debeCambiarContrasena: false,
+    contrasenaExpiraEn: null,
     ...overrides,
   };
 }
 
 function account(overrides: Record<string, unknown> = {}) {
   return {
-    customerAccountId: 'ca1',
-    customerId: 'c1',
-    passwordHash,
-    mustChangePassword: true,
-    passwordExpiresAt: new Date(Date.now() + 86_400_000),
-    customer: { customerId: 'c1', name: 'Juan', isActive: true },
+    cuentaClienteId: 'ca1',
+    clienteId: 'c1',
+    hashContrasena,
+    debeCambiarContrasena: true,
+    contrasenaExpiraEn: new Date(Date.now() + 86_400_000),
+    cliente: { clienteId: 'c1', nombre: 'Juan', activo: true },
     ...overrides,
   };
 }
 
 const CUSTOMER = {
-  customerId: 'c1',
-  name: 'Juan Pérez',
-  email: 'juan@correo.pe',
-  documentNumber: '45678912',
-  isActive: true,
+  clienteId: 'c1',
+  nombre: 'Juan Pérez',
+  correo: 'juan@correo.pe',
+  numeroDocumento: '45678912',
+  activo: true,
 };
 
 describe('AuthService', () => {
   const prisma = {
-    user: { findUnique: vi.fn(), update: vi.fn() },
+    usuario: { findUnique: vi.fn(), update: vi.fn() },
   };
   const sessions = {
     create: vi.fn().mockResolvedValue('refresh-token'),
@@ -69,6 +71,7 @@ describe('AuthService', () => {
     setOwnPassword: vi.fn(),
   };
   const customers = { findOne: vi.fn() };
+  const users = { findOne: vi.fn() };
   const config = { getOrThrow: vi.fn().mockReturnValue(15) };
   const jwt = new JwtService({
     secret: 'secreto-de-prueba-con-mas-de-32-caracteres',
@@ -76,7 +79,7 @@ describe('AuthService', () => {
   let service: AuthService;
 
   beforeAll(async () => {
-    passwordHash = await argon2.hash(PASSWORD);
+    hashContrasena = await argon2.hash(PASSWORD);
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwt,
@@ -84,6 +87,7 @@ describe('AuthService', () => {
       sessions as unknown as SessionsService,
       customerAccounts as unknown as CustomerAccountsService,
       customers as unknown as CustomersService,
+      users as unknown as UsersService,
     );
     await service.onModuleInit();
   });
@@ -91,26 +95,26 @@ describe('AuthService', () => {
   beforeEach(() => customers.findOne.mockResolvedValue(CUSTOMER));
   afterEach(() => vi.clearAllMocks());
 
-  const tokenOf = (accessToken: string) =>
-    jwt.verifyAsync<Record<string, unknown>>(accessToken);
+  const tokenOf = (tokenAcceso: string) =>
+    jwt.verifyAsync<Record<string, unknown>>(tokenAcceso);
 
   describe('loginStaff', () => {
     it('busca por correo cuando hay @, y por DNI cuando no', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
+      prisma.usuario.findUnique.mockResolvedValue(user());
 
       await service.loginStaff(' Ana@Taller.LOCAL ', PASSWORD, {});
-      expect(prisma.user.findUnique).toHaveBeenLastCalledWith({
-        where: { email: 'ana@taller.local' },
+      expect(prisma.usuario.findUnique).toHaveBeenLastCalledWith({
+        where: { correo: 'ana@taller.local' },
       });
 
       await service.loginStaff('45.678.912', PASSWORD, {});
-      expect(prisma.user.findUnique).toHaveBeenLastCalledWith({
-        where: { documentNumber: '45678912' },
+      expect(prisma.usuario.findUnique).toHaveBeenLastCalledWith({
+        where: { numeroDocumento: '45678912' },
       });
     });
 
     it('rechaza un dato que no existe con el mismo mensaje, verificando igual', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.usuario.findUnique.mockResolvedValue(null);
       const verify = vi.spyOn(argon2, 'verify');
 
       await expect(
@@ -123,30 +127,34 @@ describe('AuthService', () => {
     });
 
     it('rechaza una contraseña incorrecta y un usuario sin contraseña', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
+      prisma.usuario.findUnique.mockResolvedValue(user());
       await expect(
         service.loginStaff('ana@taller.local', 'otra', {}),
       ).rejects.toThrow(INVALID);
 
-      prisma.user.findUnique.mockResolvedValue(user({ passwordHash: null }));
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ hashContrasena: null }),
+      );
       await expect(
         service.loginStaff('ana@taller.local', PASSWORD, {}),
       ).rejects.toThrow(INVALID);
     });
 
     it('rechaza a un usuario dado de baja aunque la contraseña sea correcta', async () => {
-      prisma.user.findUnique.mockResolvedValue(user({ isActive: false }));
+      prisma.usuario.findUnique.mockResolvedValue(user({ activo: false }));
       await expect(
         service.loginStaff('ana@taller.local', PASSWORD, {}),
-      ).rejects.toThrow(new UnauthorizedException('Tu usuario está dado de baja'));
+      ).rejects.toThrow(
+        new UnauthorizedException('Tu usuario está dado de baja'),
+      );
       expect(sessions.create).not.toHaveBeenCalled();
     });
 
     it('rechaza una temporal vencida', async () => {
-      prisma.user.findUnique.mockResolvedValue(
+      prisma.usuario.findUnique.mockResolvedValue(
         user({
-          mustChangePassword: true,
-          passwordExpiresAt: new Date(Date.now() - 1000),
+          debeCambiarContrasena: true,
+          contrasenaExpiraEn: new Date(Date.now() - 1000),
         }),
       );
       await expect(
@@ -159,24 +167,24 @@ describe('AuthService', () => {
     });
 
     it('firma el acceso con el rol y la marca de temporal, y abre la sesión', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ mustChangePassword: true }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ debeCambiarContrasena: true }),
       );
 
       const result = await service.loginStaff('ana@taller.local', PASSWORD, {});
 
-      expect(await tokenOf(result.accessToken)).toMatchObject({
+      expect(await tokenOf(result.tokenAcceso)).toMatchObject({
         sub: 'u1',
-        role: 'MECHANIC',
-        mustChangePassword: true,
+        rol: 'MECANICO',
+        debeCambiarContrasena: true,
       });
-      expect(result.refreshToken).toBe('refresh-token');
-      expect(sessions.create).toHaveBeenCalledWith({ userId: 'u1' }, {});
-      expect(result.session).toMatchObject({
-        role: 'MECHANIC',
-        userId: 'u1',
-        customerId: null,
-        mustChangePassword: true,
+      expect(result.tokenRefresco).toBe('refresh-token');
+      expect(sessions.create).toHaveBeenCalledWith({ usuarioId: 'u1' }, {});
+      expect(result.sesion).toMatchObject({
+        rol: 'MECANICO',
+        usuarioId: 'u1',
+        clienteId: null,
+        debeCambiarContrasena: true,
       });
     });
   });
@@ -193,51 +201,51 @@ describe('AuthService', () => {
       verify.mockRestore();
     });
 
-    it('con una cuenta que coincide, entra como CUSTOMER con el customerId', async () => {
+    it('con una cuenta que coincide, entra como CLIENTE con el clienteId', async () => {
       customerAccounts.findLoginCandidates.mockResolvedValue([account()]);
 
       const result = await service.loginCustomer('45678912', PASSWORD, {});
 
       expect(customerAccounts.findLoginCandidates).toHaveBeenCalledWith({
-        kind: 'document',
-        value: '45678912',
+        tipo: 'documento',
+        valor: '45678912',
       });
-      expect(await tokenOf(result.accessToken)).toMatchObject({
+      expect(await tokenOf(result.tokenAcceso)).toMatchObject({
         sub: 'c1',
-        role: 'CUSTOMER',
-        mustChangePassword: true,
+        rol: 'CLIENTE',
+        debeCambiarContrasena: true,
       });
       expect(sessions.create).toHaveBeenCalledWith(
-        { customerAccountId: 'ca1' },
+        { cuentaClienteId: 'ca1' },
         {},
       );
       expect(customerAccounts.recordLogin).toHaveBeenCalledWith('ca1');
-      expect(result.session).toMatchObject({
-        role: 'CUSTOMER',
-        name: 'Juan Pérez',
-        userId: null,
-        customerId: 'c1',
+      expect(result.sesion).toMatchObject({
+        rol: 'CLIENTE',
+        nombre: 'Juan Pérez',
+        usuarioId: null,
+        clienteId: 'c1',
       });
     });
 
     it('entre varias cuentas con el mismo dato, entra la de la contraseña', async () => {
       const otherHash = await argon2.hash('otra-contrasena');
       customerAccounts.findLoginCandidates.mockResolvedValue([
-        account({ customerAccountId: 'ca0', passwordHash: otherHash }),
+        account({ cuentaClienteId: 'ca0', hashContrasena: otherHash }),
         account(),
       ]);
 
       await service.loginCustomer('juan@correo.pe', PASSWORD, {});
 
       expect(sessions.create).toHaveBeenCalledWith(
-        { customerAccountId: 'ca1' },
+        { cuentaClienteId: 'ca1' },
         {},
       );
     });
 
     it('si la contraseña coincide con más de una cuenta, pide el documento', async () => {
       customerAccounts.findLoginCandidates.mockResolvedValue([
-        account({ customerAccountId: 'ca0' }),
+        account({ cuentaClienteId: 'ca0' }),
         account(),
       ]);
       await expect(
@@ -259,7 +267,7 @@ describe('AuthService', () => {
 
     it('un cliente inactivo no entra', async () => {
       customerAccounts.findLoginCandidates.mockResolvedValue([
-        account({ customer: { customerId: 'c1', name: 'J', isActive: false } }),
+        account({ cliente: { clienteId: 'c1', nombre: 'J', activo: false } }),
       ]);
       await expect(
         service.loginCustomer('45678912', PASSWORD, {}),
@@ -272,7 +280,7 @@ describe('AuthService', () => {
 
     it('rechaza una temporal vencida', async () => {
       customerAccounts.findLoginCandidates.mockResolvedValue([
-        account({ passwordExpiresAt: new Date(Date.now() - 1000) }),
+        account({ contrasenaExpiraEn: new Date(Date.now() - 1000) }),
       ]);
       await expect(
         service.loginCustomer('45678912', PASSWORD, {}),
@@ -287,28 +295,28 @@ describe('AuthService', () => {
   describe('refresh', () => {
     it('renueva la sesión de un cliente que todavía tiene acceso', async () => {
       sessions.rotate.mockResolvedValue({
-        owner: { customerAccountId: 'ca1' },
-        familyId: 'f1',
+        dueno: { cuentaClienteId: 'ca1' },
+        familiaId: 'f1',
         token: 'nuevo',
       });
       customerAccounts.findById.mockResolvedValue(
-        account({ mustChangePassword: false }),
+        account({ debeCambiarContrasena: false }),
       );
 
       const result = await service.refresh('viejo', {});
 
-      expect(await tokenOf(result.accessToken)).toMatchObject({
+      expect(await tokenOf(result.tokenAcceso)).toMatchObject({
         sub: 'c1',
-        role: 'CUSTOMER',
-        mustChangePassword: false,
+        rol: 'CLIENTE',
+        debeCambiarContrasena: false,
       });
-      expect(result.refreshToken).toBe('nuevo');
+      expect(result.tokenRefresco).toBe('nuevo');
     });
 
     it('si le quitaron el acceso, revoca la familia y rechaza', async () => {
       sessions.rotate.mockResolvedValue({
-        owner: { customerAccountId: 'ca1' },
-        familyId: 'f1',
+        dueno: { cuentaClienteId: 'ca1' },
+        familiaId: 'f1',
         token: 'nuevo',
       });
       customerAccounts.findById.mockResolvedValue(null);
@@ -321,11 +329,11 @@ describe('AuthService', () => {
 
     it('un usuario dado de baja no renueva', async () => {
       sessions.rotate.mockResolvedValue({
-        owner: { userId: 'u1' },
-        familyId: 'f1',
+        dueno: { usuarioId: 'u1' },
+        familiaId: 'f1',
         token: 'nuevo',
       });
-      prisma.user.findUnique.mockResolvedValue(user({ isActive: false }));
+      prisma.usuario.findUnique.mockResolvedValue(user({ activo: false }));
 
       await expect(service.refresh('viejo', {})).rejects.toThrow(
         new UnauthorizedException('Tu usuario está dado de baja'),
@@ -335,12 +343,12 @@ describe('AuthService', () => {
   });
 
   describe('changeOwnPassword', () => {
-    const principal = { kind: 'customer' as const, customerId: 'c1' };
+    const principal = { tipo: 'cliente' as const, clienteId: 'c1' };
 
     it('cambia la del cliente, quita la marca, cierra sus sesiones y abre una nueva', async () => {
       customerAccounts.findByCustomerId.mockResolvedValue(account());
       customerAccounts.setOwnPassword.mockResolvedValue(
-        account({ mustChangePassword: false, passwordExpiresAt: null }),
+        account({ debeCambiarContrasena: false, contrasenaExpiraEn: null }),
       );
 
       const result = await service.changeOwnPassword(
@@ -355,14 +363,14 @@ describe('AuthService', () => {
       expect(accountId).toBe('ca1');
       expect(await argon2.verify(newHash, 'Mi-clave-nueva')).toBe(true);
       expect(sessions.revokeAll).toHaveBeenCalledWith({
-        customerAccountId: 'ca1',
+        cuentaClienteId: 'ca1',
       });
       expect(sessions.create).toHaveBeenCalledWith(
-        { customerAccountId: 'ca1' },
+        { cuentaClienteId: 'ca1' },
         {},
       );
-      expect(await tokenOf(result.accessToken)).toMatchObject({
-        mustChangePassword: false,
+      expect(await tokenOf(result.tokenAcceso)).toMatchObject({
+        debeCambiarContrasena: false,
       });
     });
 
@@ -394,26 +402,168 @@ describe('AuthService', () => {
     });
 
     it('cambia la del personal en su tabla', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ mustChangePassword: true }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ debeCambiarContrasena: true }),
       );
-      prisma.user.update.mockResolvedValue(user());
+      prisma.usuario.update.mockResolvedValue(user());
 
       await service.changeOwnPassword(
-        { kind: 'staff', userId: 'u1', role: 'MECHANIC' },
+        { tipo: 'personal', usuarioId: 'u1', rol: 'MECANICO' },
         PASSWORD,
         'Mi-clave-nueva',
         {},
       );
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { userId: 'u1' },
+      expect(prisma.usuario.update).toHaveBeenCalledWith({
+        where: { usuarioId: 'u1' },
         data: expect.objectContaining({
-          mustChangePassword: false,
-          passwordExpiresAt: null,
+          debeCambiarContrasena: false,
+          contrasenaExpiraEn: null,
         }),
       });
-      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'u1' });
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ usuarioId: 'u1' });
+    });
+  });
+
+  describe('getProfile', () => {
+    const MEMBER_SINCE = new Date('2026-01-10T15:00:00Z');
+    const LAST_LOGIN = new Date('2026-11-14T13:30:00Z');
+
+    it('arma el del personal por UsersService, con DNI si tiene documento', async () => {
+      users.findOne.mockResolvedValue(
+        user({
+          rol: 'ADMINISTRADOR',
+          telefono: '987654321',
+          ultimoIngresoEn: LAST_LOGIN,
+          creadoEn: MEMBER_SINCE,
+        }),
+      );
+
+      const profile = await service.getProfile({
+        tipo: 'personal',
+        usuarioId: 'u1',
+        rol: 'ADMINISTRADOR',
+      });
+
+      expect(users.findOne).toHaveBeenCalledWith('u1');
+      expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+      expect(profile).toEqual({
+        tipo: 'PERSONAL',
+        nombre: 'Ana',
+        correo: 'ana@taller.local',
+        telefono: '987654321',
+        tipoDocumento: 'DNI',
+        numeroDocumento: '45678912',
+        rol: 'ADMINISTRADOR',
+        direccion: null,
+        ultimoIngresoEn: LAST_LOGIN,
+        miembroDesde: MEMBER_SINCE,
+      });
+    });
+
+    it('deja el tipo de documento vacío si el personal no tiene DNI', async () => {
+      users.findOne.mockResolvedValue(
+        user({ numeroDocumento: null, telefono: null, creadoEn: MEMBER_SINCE }),
+      );
+      const profile = await service.getProfile({
+        tipo: 'personal',
+        usuarioId: 'u1',
+        rol: 'MECANICO',
+      });
+      expect(profile).toMatchObject({
+        tipoDocumento: null,
+        numeroDocumento: null,
+      });
+    });
+
+    it('no muestra el perfil de un usuario dado de baja', async () => {
+      users.findOne.mockResolvedValue(user({ activo: false }));
+      await expect(
+        service.getProfile({
+          tipo: 'personal',
+          usuarioId: 'u1',
+          rol: 'MECANICO',
+        }),
+      ).rejects.toThrow(
+        new UnauthorizedException('Tu usuario está dado de baja'),
+      );
+    });
+
+    it('arma el del cliente con su documento, dirección y el último ingreso al portal', async () => {
+      customerAccounts.findByCustomerId.mockResolvedValue(
+        account({ ultimoIngresoEn: LAST_LOGIN }),
+      );
+      customers.findOne.mockResolvedValue({
+        ...CUSTOMER,
+        tipoDocumento: 'DNI',
+        telefono: '912345678',
+        direccion: 'Av. Los Olivos 123',
+        creadoEn: MEMBER_SINCE,
+      });
+
+      const profile = await service.getProfile({
+        tipo: 'cliente',
+        clienteId: 'c1',
+      });
+
+      expect(customerAccounts.findByCustomerId).toHaveBeenCalledWith('c1');
+      expect(customers.findOne).toHaveBeenCalledWith('c1');
+      expect(profile).toEqual({
+        tipo: 'CLIENTE',
+        nombre: 'Juan Pérez',
+        correo: 'juan@correo.pe',
+        telefono: '912345678',
+        tipoDocumento: 'DNI',
+        numeroDocumento: '45678912',
+        rol: 'CLIENTE',
+        direccion: 'Av. Los Olivos 123',
+        ultimoIngresoEn: LAST_LOGIN,
+        miembroDesde: MEMBER_SINCE,
+      });
+    });
+
+    it('rechaza a un cliente sin acceso al portal o inactivo', async () => {
+      customerAccounts.findByCustomerId.mockResolvedValue(null);
+      await expect(
+        service.getProfile({ tipo: 'cliente', clienteId: 'c1' }),
+      ).rejects.toThrow(
+        new UnauthorizedException('Ya no tienes acceso al portal'),
+      );
+
+      customerAccounts.findByCustomerId.mockResolvedValue(account());
+      customers.findOne.mockResolvedValue({ ...CUSTOMER, activo: false });
+      await expect(
+        service.getProfile({ tipo: 'cliente', clienteId: 'c1' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('la respuesta no saca hashes ni ids, aunque el modelo los traiga', () => {
+      const leaky = {
+        tipo: 'PERSONAL' as const,
+        nombre: 'Ana',
+        correo: null,
+        telefono: null,
+        tipoDocumento: null,
+        numeroDocumento: null,
+        rol: 'MECANICO' as const,
+        direccion: null,
+        ultimoIngresoEn: null,
+        miembroDesde: MEMBER_SINCE,
+        hashContrasena: 'hash',
+        usuarioId: 'u1',
+      };
+      expect(Object.keys(new Profile(leaky)).sort()).toEqual([
+        'correo',
+        'direccion',
+        'miembroDesde',
+        'nombre',
+        'numeroDocumento',
+        'rol',
+        'telefono',
+        'tipo',
+        'tipoDocumento',
+        'ultimoIngresoEn',
+      ]);
     });
   });
 });

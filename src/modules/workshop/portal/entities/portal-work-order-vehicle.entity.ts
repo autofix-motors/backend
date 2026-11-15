@@ -3,22 +3,22 @@ import type { WorkOrderVehicleModel } from '../../work-orders/entities/work-orde
 
 /** El vehículo de una orden, resumido, para el portal. */
 export class PortalWorkOrderVehicle {
-  constructor(vehicle: WorkOrderVehicleModel) {
-    this.vehicleId = vehicle.vehicleId;
-    this.plate = vehicle.plate;
-    this.brand = vehicle.brand;
-    this.model = vehicle.model;
+  constructor(vehiculo: WorkOrderVehicleModel) {
+    this.vehiculoId = vehiculo.vehiculoId;
+    this.placa = vehiculo.placa;
+    this.marca = vehiculo.marca;
+    this.modelo = vehiculo.modelo;
   }
 
   @ApiProperty({ format: 'uuid' })
-  vehicleId: string;
+  vehiculoId: string;
 
   @ApiProperty({ example: 'ABC123' })
-  plate: string;
+  placa: string;
 
   @ApiProperty({ example: 'Toyota' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 'Yaris' })
-  model: string;
+  modelo: string;
 }

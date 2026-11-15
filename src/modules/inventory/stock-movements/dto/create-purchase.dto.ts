@@ -24,7 +24,7 @@ export const MOVEMENT_NOTE_MAX_LENGTH = 500;
 export class CreatePurchaseDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID('4', { message: 'Selecciona el producto' })
-  productId: string;
+  productoId: string;
 
   @ApiProperty({
     oneOf: [
@@ -37,7 +37,7 @@ export class CreatePurchaseDto {
   @ToQuantityText()
   @IsMovementQuantity('La cantidad', { signed: false })
   @IsNotEmpty({ message: 'Ingresa la cantidad' })
-  quantity: string;
+  cantidad: string;
 
   @ApiProperty({
     oneOf: [
@@ -50,7 +50,7 @@ export class CreatePurchaseDto {
   @ToMoneyText()
   @IsMoney('El costo unitario')
   @IsNotEmpty({ message: 'Ingresa el costo unitario' })
-  unitCost: string;
+  costoUnitario: string;
 
   @ApiPropertyOptional({
     type: String,
@@ -65,5 +65,5 @@ export class CreatePurchaseDto {
     message: `La nota tiene como máximo ${MOVEMENT_NOTE_MAX_LENGTH} caracteres`,
   })
   @IsString({ message: 'La nota tiene que ser texto' })
-  note?: string | null;
+  nota?: string | null;
 }

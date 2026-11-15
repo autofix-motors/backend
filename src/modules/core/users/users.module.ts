@@ -6,7 +6,7 @@ import { UsersService } from './users.service.js';
 // Importa SessionsModule: al desactivar a un usuario o restablecerle la
 // contraseña o cambiarle el rol se cierran sus sesiones, y esa tabla es de
 // sessions (invariante 3). Exporta su service para que otro módulo verifique a un
-// usuario (las herramientas, a quién se asignan) sin leer su tabla.
+// usuario sin leer su tabla (las órdenes, al asignar el mecánico).
 @Module({
   imports: [SessionsModule],
   controllers: [UsersController],

@@ -17,18 +17,18 @@ import {
 } from './work-order-user.entity.js';
 import { WorkOrder, type WorkOrderWithRelations } from './work-order.entity.js';
 
-export type WorkOrderWithTimeline = Omit<WorkOrderWithRelations, 'items'> & {
-  createdBy: WorkOrderUserModel;
-  events: WorkOrderEventWithAuthor[];
-  items: WorkOrderItemWithProduct[];
-  quotes: QuoteWithRelations[];
+export type WorkOrderWithTimeline = Omit<WorkOrderWithRelations, 'detalles'> & {
+  creadoPor: WorkOrderUserModel;
+  eventos: WorkOrderEventWithAuthor[];
+  detalles: WorkOrderItemWithProduct[];
+  presupuestos: QuoteWithRelations[];
 };
 
 /**
  * Una orden completa, para su pantalla de detalle: lo del listado más el
  * diagnóstico, la cancelación, quién la registró, la línea de tiempo, los
  * servicios y repuestos con sus montos y los presupuestos. El costo de los repuestos y su margen
- * salen solo con `includeCosts` (ADMIN).
+ * salen solo con `incluirCostos` (ADMINISTRADOR).
  *
  * Extiende `WorkOrder` (una clase concreta, con `super(order)`), no una base
  * abstracta: el detalle es el mismo recurso con más campos, y repetir los del
@@ -37,55 +37,57 @@ export type WorkOrderWithTimeline = Omit<WorkOrderWithRelations, 'items'> & {
 export class WorkOrderDetail extends WorkOrder {
   constructor(
     order: WorkOrderWithTimeline,
-    { includeCosts }: { includeCosts: boolean },
+    { incluirCostos }: { incluirCostos: boolean },
     today: string = limaToday(),
   ) {
     super(order, today);
-    this.diagnosis = order.diagnosis;
-    this.cancelledAt = order.cancelledAt;
-    this.cancelReason = order.cancelReason;
-    this.createdBy = new WorkOrderUser(order.createdBy);
-    this.events = order.events.map((event) => new WorkOrderEvent(event));
-    this.items = order.items.map(
-      (item) => new WorkOrderItem(item, { includeCosts }),
+    this.diagnostico = order.diagnostico;
+    this.canceladaEn = order.canceladaEn;
+    this.motivoCancelacion = order.motivoCancelacion;
+    this.creadoPor = new WorkOrderUser(order.creadoPor);
+    this.eventos = order.eventos.map((event) => new WorkOrderEvent(event));
+    this.detalles = order.detalles.map(
+      (item) => new WorkOrderItem(item, { incluirCostos }),
     );
-    this.totals = new WorkOrderTotals(workOrderAmounts(order.items), {
-      includeCosts,
+    this.totales = new WorkOrderTotals(workOrderAmounts(order.detalles), {
+      incluirCostos,
     });
-    this.quotes = order.quotes.map((quote) => new Quote(quote));
+    this.presupuestos = order.presupuestos.map(
+      (presupuesto) => new Quote(presupuesto),
+    );
   }
 
   @ApiProperty({ type: String, nullable: true })
-  diagnosis: string | null;
+  diagnostico: string | null;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  cancelledAt: Date | null;
+  canceladaEn: Date | null;
 
   @ApiProperty({ type: String, nullable: true })
-  cancelReason: string | null;
+  motivoCancelacion: string | null;
 
   @ApiProperty({ type: WorkOrderUser, description: 'Quién la registró' })
-  createdBy: WorkOrderUser;
+  creadoPor: WorkOrderUser;
 
   @ApiProperty({
     type: [WorkOrderEvent],
     description: 'La línea de tiempo, de la más antigua a la más reciente',
   })
-  events: WorkOrderEvent[];
+  eventos: WorkOrderEvent[];
 
   @ApiProperty({
     type: [WorkOrderItem],
     description: 'Servicios y repuestos, en el orden en que se agregaron',
   })
-  items: WorkOrderItem[];
+  detalles: WorkOrderItem[];
 
   @ApiProperty({ type: WorkOrderTotals })
-  totals: WorkOrderTotals;
+  totales: WorkOrderTotals;
 
   @ApiProperty({
     type: [Quote],
     description:
       'Los presupuestos enviados, de la versión más nueva a la más vieja',
   })
-  quotes: Quote[];
+  presupuestos: Quote[];
 }

@@ -17,8 +17,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 /**
  * Guard global: toda petición necesita un JWT de acceso válido en la cookie
  * afm_access, salvo los endpoints marcados con @Public(). Si el token es
- * válido, deja en la petición al usuario del personal (`request.user`, para
- * @CurrentUser()) o al cliente (`request.customer`), nunca a los dos, y la
+ * válido, deja en la petición al usuario del personal (`request.usuario`, para
+ * @CurrentUser()) o al cliente (`request.cliente`), nunca a los dos, y la
  * marca de contraseña temporal para el PasswordChangeGuard.
  *
  * No consulta la base: la firma y el vencimiento del token alcanzan. Por eso un
@@ -54,14 +54,14 @@ export class AccessGuard implements CanActivate {
       throw new UnauthorizedException('Tu sesión expiró');
     }
 
-    if (payload.role === CUSTOMER_ROLE) {
-      request.customer = { customerId: payload.sub };
+    if (payload.rol === CUSTOMER_ROLE) {
+      request.cliente = { clienteId: payload.sub };
     } else {
-      request.user = { userId: payload.sub, role: payload.role };
+      request.usuario = { usuarioId: payload.sub, rol: payload.rol };
     }
     // Un token emitido antes de que existiera la marca no la trae: no está
     // pendiente.
-    request.mustChangePassword = payload.mustChangePassword === true;
+    request.debeCambiarContrasena = payload.debeCambiarContrasena === true;
     return true;
   }
 }

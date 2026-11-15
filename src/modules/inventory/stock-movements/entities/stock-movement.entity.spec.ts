@@ -3,24 +3,24 @@ import { StockMovement } from './stock-movement.entity.js';
 
 function model(overrides: Record<string, unknown> = {}) {
   return {
-    stockMovementId: 'm1',
-    productId: 'p1',
-    type: 'ADJUSTMENT' as const,
-    quantity: new Prisma.Decimal('-1.5'),
-    unitCost: new Prisma.Decimal('68'),
-    workOrderItemId: null,
-    note: 'Merma: envase roto',
-    createdById: 'u1',
-    createdAt: new Date('2026-10-04T20:00:00.000Z'),
-    product: {
-      productId: 'p1',
-      code: 'ACE-2050-GL',
-      name: 'Aceite de motor 20W-50',
-      unit: 'GALLON' as const,
+    movimientoStockId: 'm1',
+    productoId: 'p1',
+    tipo: 'AJUSTE' as const,
+    cantidad: new Prisma.Decimal('-1.5'),
+    costoUnitario: new Prisma.Decimal('68'),
+    detalleOrdenId: null,
+    nota: 'Merma: envase roto',
+    creadoPorId: 'u1',
+    creadoEn: new Date('2026-10-04T20:00:00.000Z'),
+    producto: {
+      productoId: 'p1',
+      codigo: 'ACE-2050-GL',
+      nombre: 'Aceite de motor 20W-50',
+      unidad: 'GALON' as const,
       // Lo que no es del resumen no sale aunque venga en el registro.
-      cost: new Prisma.Decimal('68'),
+      costo: new Prisma.Decimal('68'),
     },
-    createdBy: { userId: 'u1', name: 'Administrador', email: 'a@b.pe' },
+    creadoPor: { usuarioId: 'u1', nombre: 'Administrador', correo: 'a@b.pe' },
     ...overrides,
   };
 }
@@ -29,37 +29,40 @@ const json = (movement: StockMovement) =>
   JSON.parse(JSON.stringify(movement)) as Record<string, unknown>;
 
 describe('StockMovement', () => {
-  it('saca la cantidad con su signo y dos decimales, y el costo para ADMIN', () => {
+  it('saca la cantidad con su signo y dos decimales, y el costo para ADMINISTRADOR', () => {
     expect(
-      json(new StockMovement(model(), { includeCosts: true })),
+      json(new StockMovement(model(), { incluirCostos: true })),
     ).toStrictEqual({
-      stockMovementId: 'm1',
-      type: 'ADJUSTMENT',
-      quantity: '-1.50',
-      unitCost: '68.00',
-      note: 'Merma: envase roto',
-      workOrderItemId: null,
-      product: {
-        productId: 'p1',
-        code: 'ACE-2050-GL',
-        name: 'Aceite de motor 20W-50',
-        unit: 'GALLON',
+      movimientoStockId: 'm1',
+      tipo: 'AJUSTE',
+      cantidad: '-1.50',
+      costoUnitario: '68.00',
+      nota: 'Merma: envase roto',
+      detalleOrdenId: null,
+      producto: {
+        productoId: 'p1',
+        codigo: 'ACE-2050-GL',
+        nombre: 'Aceite de motor 20W-50',
+        unidad: 'GALON',
       },
-      createdBy: { userId: 'u1', name: 'Administrador' },
-      createdAt: '2026-10-04T20:00:00.000Z',
+      creadoPor: { usuarioId: 'u1', nombre: 'Administrador' },
+      creadoEn: '2026-10-04T20:00:00.000Z',
     });
   });
 
   it('para el mecánico no saca el costo', () => {
     expect(
-      json(new StockMovement(model(), { includeCosts: false })),
-    ).not.toHaveProperty('unitCost');
+      json(new StockMovement(model(), { incluirCostos: false })),
+    ).not.toHaveProperty('costoUnitario');
   });
 
-  it('un movimiento sin costo lo saca como null para ADMIN', () => {
+  it('un movimiento sin costo lo saca como null para ADMINISTRADOR', () => {
     expect(
-      json(new StockMovement(model({ unitCost: null }), { includeCosts: true }))
-        .unitCost,
+      json(
+        new StockMovement(model({ costoUnitario: null }), {
+          incluirCostos: true,
+        }),
+      ).costoUnitario,
     ).toBeNull();
   });
 });

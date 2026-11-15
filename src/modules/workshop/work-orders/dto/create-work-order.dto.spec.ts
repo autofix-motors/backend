@@ -29,15 +29,15 @@ const VEHICLE_ID = '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70';
 
 describe('CreateWorkOrderDto', () => {
   const valid = {
-    vehicleId: VEHICLE_ID,
-    mileageIn: 84500,
-    reason: '  Ruido al frenar  ',
+    vehiculoId: VEHICLE_ID,
+    kilometrajeIngreso: 84500,
+    motivo: '  Ruido al frenar  ',
   };
 
   it('acepta el ingreso mínimo y recorta el motivo', async () => {
     const { dto, messages } = await check(CreateWorkOrderDto, valid);
     expect(messages).toEqual([]);
-    expect(dto.reason).toBe('Ruido al frenar');
+    expect(dto.motivo).toBe('Ruido al frenar');
   });
 
   it('acepta la fecha prometida y el mecánico, o null en los dos', async () => {
@@ -45,8 +45,8 @@ describe('CreateWorkOrderDto', () => {
       (
         await check(CreateWorkOrderDto, {
           ...valid,
-          promisedDate: '2026-10-08',
-          mechanicId: VEHICLE_ID,
+          fechaPrometida: '2026-10-08',
+          mecanicoId: VEHICLE_ID,
         })
       ).messages,
     ).toEqual([]);
@@ -54,8 +54,8 @@ describe('CreateWorkOrderDto', () => {
       (
         await check(CreateWorkOrderDto, {
           ...valid,
-          promisedDate: null,
-          mechanicId: null,
+          fechaPrometida: null,
+          mecanicoId: null,
         })
       ).messages,
     ).toEqual([]);
@@ -63,7 +63,7 @@ describe('CreateWorkOrderDto', () => {
 
   it('pide el vehículo, el kilometraje y el motivo', async () => {
     expect(
-      (await check(CreateWorkOrderDto, { reason: '   ' })).messages,
+      (await check(CreateWorkOrderDto, { motivo: '   ' })).messages,
     ).toEqual([
       'Selecciona el vehículo',
       'El kilometraje es un número entero de km',
@@ -72,8 +72,9 @@ describe('CreateWorkOrderDto', () => {
   });
 
   it('el kilometraje es un entero de 0 a 9 999 999', async () => {
-    const mileage = async (mileageIn: unknown) =>
-      (await check(CreateWorkOrderDto, { ...valid, mileageIn })).messages;
+    const mileage = async (kilometrajeIngreso: unknown) =>
+      (await check(CreateWorkOrderDto, { ...valid, kilometrajeIngreso }))
+        .messages;
     expect(await mileage(0)).toEqual([]);
     expect(await mileage(9_999_999)).toEqual([]);
     expect(await mileage(-1)).toEqual(['El kilometraje no puede ser negativo']);
@@ -93,9 +94,9 @@ describe('CreateWorkOrderDto', () => {
       (
         await check(CreateWorkOrderDto, {
           ...valid,
-          reason: 'x'.repeat(2001),
-          promisedDate: '2026-02-30',
-          mechanicId: '123',
+          motivo: 'x'.repeat(2001),
+          fechaPrometida: '2026-02-30',
+          mecanicoId: '123',
         })
       ).messages,
     ).toEqual([

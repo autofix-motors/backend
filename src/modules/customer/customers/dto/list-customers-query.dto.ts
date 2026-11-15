@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsIn, IsOptional } from 'class-validator';
-import { DocumentType } from '../../../../generated/prisma/enums.js';
+import { TipoDocumento } from '../../../../generated/prisma/enums.js';
 import { PaginationQueryDto } from '../../../../shared/dto/pagination-query.dto.js';
 
-export const CUSTOMER_SORT_FIELDS = ['name', 'createdAt'] as const;
+export const CUSTOMER_SORT_FIELDS = ['nombre', 'creadoEn'] as const;
 export type CustomerSortField = (typeof CUSTOMER_SORT_FIELDS)[number];
 
 /**
@@ -12,12 +12,12 @@ export type CustomerSortField = (typeof CUSTOMER_SORT_FIELDS)[number];
  * número de documento; los filtros son el tipo de documento y el estado.
  */
 export class ListCustomersQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: DocumentType, enumName: 'DocumentType' })
+  @ApiPropertyOptional({ enum: TipoDocumento, enumName: 'TipoDocumento' })
   @IsOptional()
-  @IsEnum(DocumentType, {
-    message: 'El tipo de documento es DNI, RUC, CE o PASSPORT',
+  @IsEnum(TipoDocumento, {
+    message: 'El tipo de documento es DNI, RUC, CE o PASAPORTE',
   })
-  documentType?: DocumentType;
+  tipoDocumento?: TipoDocumento;
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
@@ -26,15 +26,15 @@ export class ListCustomersQueryDto extends PaginationQueryDto {
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean({ message: 'El estado es true o false' })
-  isActive?: boolean;
+  activo?: boolean;
 
-  @ApiPropertyOptional({ enum: CUSTOMER_SORT_FIELDS, default: 'name' })
+  @ApiPropertyOptional({ enum: CUSTOMER_SORT_FIELDS, default: 'nombre' })
   @IsOptional()
-  @IsIn(CUSTOMER_SORT_FIELDS, { message: 'Se ordena por name o createdAt' })
-  sortBy: CustomerSortField = 'name';
+  @IsIn(CUSTOMER_SORT_FIELDS, { message: 'Se ordena por nombre o creadoEn' })
+  ordenarPor: CustomerSortField = 'nombre';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   @IsOptional()
-  @IsIn(['asc', 'desc'], { message: 'El orden es asc o desc' })
-  sortOrder: 'asc' | 'desc' = 'asc';
+  @IsIn(['asc', 'desc'], { message: 'El sentido es asc o desc' })
+  sentido: 'asc' | 'desc' = 'asc';
 }

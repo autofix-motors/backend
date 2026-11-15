@@ -1,29 +1,29 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Vehicle as VehicleModel } from '../../../../generated/prisma/client.js';
+import type { Vehiculo as VehicleModel } from '../../../../generated/prisma/client.js';
 
 export type WorkOrderVehicleModel = Pick<
   VehicleModel,
-  'vehicleId' | 'plate' | 'brand' | 'model'
+  'vehiculoId' | 'placa' | 'marca' | 'modelo'
 >;
 
 /** El vehículo de una orden, resumido: lo que se ve en el listado. */
 export class WorkOrderVehicle {
-  constructor(vehicle: WorkOrderVehicleModel) {
-    this.vehicleId = vehicle.vehicleId;
-    this.plate = vehicle.plate;
-    this.brand = vehicle.brand;
-    this.model = vehicle.model;
+  constructor(vehiculo: WorkOrderVehicleModel) {
+    this.vehiculoId = vehiculo.vehiculoId;
+    this.placa = vehiculo.placa;
+    this.marca = vehiculo.marca;
+    this.modelo = vehiculo.modelo;
   }
 
   @ApiProperty({ format: 'uuid' })
-  vehicleId: string;
+  vehiculoId: string;
 
   @ApiProperty({ example: 'ABK582' })
-  plate: string;
+  placa: string;
 
   @ApiProperty({ example: 'Toyota' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 'Yaris' })
-  model: string;
+  modelo: string;
 }

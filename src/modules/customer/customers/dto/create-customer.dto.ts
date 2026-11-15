@@ -16,7 +16,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { TrimToNull } from '../../../../core/validation/trim-to-null.transform.js';
-import { DocumentType } from '../../../../generated/prisma/enums.js';
+import { TipoDocumento } from '../../../../generated/prisma/enums.js';
 import {
   documentNumberError,
   normalizeDocumentNumber,
@@ -42,20 +42,20 @@ export class DocumentNumberMatchesType implements ValidatorConstraintInterface {
 }
 
 function mismatch(value: unknown, args: ValidationArguments): string | null {
-  const { documentType } = args.object as { documentType?: unknown };
-  const isType = Object.values(DocumentType).includes(
-    documentType as DocumentType,
+  const { tipoDocumento } = args.object as { tipoDocumento?: unknown };
+  const isType = Object.values(TipoDocumento).includes(
+    tipoDocumento as TipoDocumento,
   );
   if (typeof value !== 'string' || !isType) return null;
-  return documentNumberError(documentType as DocumentType, value);
+  return documentNumberError(tipoDocumento as TipoDocumento, value);
 }
 
 export class CreateCustomerDto {
-  @ApiProperty({ enum: DocumentType, enumName: 'DocumentType' })
-  @IsEnum(DocumentType, {
-    message: 'El tipo de documento es DNI, RUC, CE o PASSPORT',
+  @ApiProperty({ enum: TipoDocumento, enumName: 'TipoDocumento' })
+  @IsEnum(TipoDocumento, {
+    message: 'El tipo de documento es DNI, RUC, CE o PASAPORTE',
   })
-  documentType: DocumentType;
+  tipoDocumento: TipoDocumento;
 
   @ApiProperty({ example: '45678912', maxLength: 20 })
   @Transform(({ value }: { value: unknown }) =>
@@ -67,14 +67,14 @@ export class CreateCustomerDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa el número de documento' })
-  documentNumber: string;
+  numeroDocumento: string;
 
   @ApiProperty({ example: 'Juan Pérez Rojas', maxLength: 150 })
   @Transform(trim)
   @MaxLength(150, { message: 'El nombre tiene como máximo 150 caracteres' })
   @IsNotEmpty({ message: 'Ingresa el nombre o la razón social' })
   @IsString({ message: 'Ingresa el nombre o la razón social' })
-  name: string;
+  nombre: string;
 
   @ApiProperty({ example: '987654321', maxLength: 20 })
   // Se guarda sin espacios, guiones ni paréntesis: es lo que se usa para armar
@@ -86,7 +86,7 @@ export class CreateCustomerDto {
     message: 'El teléfono tiene de 6 a 15 dígitos y puede empezar con +',
   })
   @IsString({ message: 'Ingresa el teléfono' })
-  phone: string;
+  telefono: string;
 
   @ApiPropertyOptional({
     type: String,
@@ -102,26 +102,26 @@ export class CreateCustomerDto {
   )
   @MaxLength(254, { message: 'El correo es demasiado largo' })
   @IsEmail({}, { message: 'Ingresa un correo válido' })
-  email?: string | null;
+  correo?: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 250 })
   @IsOptional()
   @TrimToNull()
   @MaxLength(250, { message: 'La dirección tiene como máximo 250 caracteres' })
   @IsString({ message: 'La dirección tiene que ser texto' })
-  address?: string | null;
+  direccion?: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
   @IsOptional()
   @TrimToNull()
   @MaxLength(1000, { message: 'Las notas tienen como máximo 1000 caracteres' })
   @IsString({ message: 'Las notas tienen que ser texto' })
-  notes?: string | null;
+  notas?: string | null;
 
   @ApiPropertyOptional({ default: true })
   // Opcional pero no anulable: con @IsOptional un `null` pasaría sin validar y
   // la base lo rechazaría con un 500 (la columna no admite vacío).
   @ValidateIf((_dto: CreateCustomerDto, value: unknown) => value !== undefined)
   @IsBoolean({ message: 'El estado tiene que ser verdadero o falso' })
-  isActive?: boolean;
+  activo?: boolean;
 }

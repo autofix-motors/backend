@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { WorkOrderEvent as WorkOrderEventModel } from '../../../../generated/prisma/client.js';
-import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
+import type { EventoOrden as WorkOrderEventModel } from '../../../../generated/prisma/client.js';
+import { EstadoOrden } from '../../../../generated/prisma/enums.js';
 
 /**
  * Un paso de la línea de tiempo, como lo ve el cliente: qué pasó y cuándo. Sin
@@ -9,22 +9,22 @@ import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
  */
 export class PortalEvent {
   constructor(event: WorkOrderEventModel) {
-    this.status = event.status;
-    this.note = event.note;
-    this.createdAt = event.createdAt;
+    this.estado = event.estado;
+    this.nota = event.nota;
+    this.creadoEn = event.creadoEn;
   }
 
   @ApiProperty({
-    enum: WorkOrderStatus,
-    enumName: 'WorkOrderStatus',
+    enum: EstadoOrden,
+    enumName: 'EstadoOrden',
     nullable: true,
     description: 'El estado al que pasó; null si es solo una nota',
   })
-  status: WorkOrderStatus | null;
+  estado: EstadoOrden | null;
 
   @ApiProperty({ type: String, nullable: true })
-  note: string | null;
+  nota: string | null;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 }

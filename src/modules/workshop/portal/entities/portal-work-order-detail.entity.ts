@@ -18,23 +18,25 @@ import { PortalWorkOrder } from './portal-work-order.entity.js';
 export class PortalWorkOrderDetail extends PortalWorkOrder {
   constructor(order: WorkOrderWithTimeline) {
     super(order);
-    this.mileageIn = order.mileageIn;
-    this.diagnosis = order.diagnosis;
-    this.mechanicName = order.mechanic?.name ?? null;
-    this.cancelReason = order.cancelReason;
-    this.items = order.items.map((item) => new PortalLine(item));
-    this.totals = new PortalTotals(workOrderAmounts(order.items));
-    this.events = order.events
-      .filter((event) => event.isPublic)
+    this.kilometrajeIngreso = order.kilometrajeIngreso;
+    this.diagnostico = order.diagnostico;
+    this.nombreMecanico = order.mecanico?.nombre ?? null;
+    this.motivoCancelacion = order.motivoCancelacion;
+    this.detalles = order.detalles.map((item) => new PortalLine(item));
+    this.totales = new PortalTotals(workOrderAmounts(order.detalles));
+    this.eventos = order.eventos
+      .filter((event) => event.esPublico)
       .map((event) => new PortalEvent(event));
-    this.quotes = order.quotes.map((quote) => new PortalQuote(quote));
+    this.presupuestos = order.presupuestos.map(
+      (presupuesto) => new PortalQuote(presupuesto),
+    );
   }
 
   @ApiProperty({ example: 85000 })
-  mileageIn: number;
+  kilometrajeIngreso: number;
 
   @ApiProperty({ type: String, nullable: true })
-  diagnosis: string | null;
+  diagnostico: string | null;
 
   @ApiProperty({
     type: String,
@@ -42,27 +44,27 @@ export class PortalWorkOrderDetail extends PortalWorkOrder {
     example: 'Juan Quispe',
     description: 'El mecánico que atiende su vehículo',
   })
-  mechanicName: string | null;
+  nombreMecanico: string | null;
 
   @ApiProperty({ type: String, nullable: true })
-  cancelReason: string | null;
+  motivoCancelacion: string | null;
 
   @ApiProperty({ type: [PortalLine] })
-  items: PortalLine[];
+  detalles: PortalLine[];
 
   @ApiProperty({ type: PortalTotals })
-  totals: PortalTotals;
+  totales: PortalTotals;
 
   @ApiProperty({
     type: [PortalEvent],
     description: 'Solo los eventos públicos, del más antiguo al más nuevo',
   })
-  events: PortalEvent[];
+  eventos: PortalEvent[];
 
   @ApiProperty({
     type: [PortalQuote],
     description:
       'Las versiones del presupuesto, de la más nueva a la más vieja',
   })
-  quotes: PortalQuote[];
+  presupuestos: PortalQuote[];
 }

@@ -17,7 +17,7 @@ import type { SessionUser } from '../../../core/auth/session-user.js';
 import { CurrentUser } from '../../../core/decorators/current-user.decorator.js';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -29,17 +29,17 @@ import { ListStockMovementsQueryDto } from './dto/list-stock-movements-query.dto
 import { StockMovement } from './entities/stock-movement.entity.js';
 import { StockMovementsService } from './stock-movements.service.js';
 
-// El costo unitario sale solo para ADMIN. Registrar es solo suyo, así que su
-// respuesta siempre lo lleva.
+// El costo unitario sale solo para ADMINISTRADOR. Registrar es solo suyo, así
+// que su respuesta siempre lo lleva.
 const costsFor = (user: SessionUser) => ({
-  includeCosts: user.role === UserRole.ADMIN,
+  incluirCostos: user.rol === RolUsuario.ADMINISTRADOR,
 });
-const WITH_COSTS = { includeCosts: true };
+const WITH_COSTS = { incluirCostos: true };
 
 /**
  * El kardex: las entradas y salidas de cada producto. Los dos roles lo
  * consultan —el mecánico, sin costos—, pero solo el administrador registra
- * compras y ajustes. Los consumos en órdenes (WORK_ORDER) no se registran
+ * compras y ajustes. Los consumos en órdenes (ORDEN_TRABAJO) no se registran
  * aquí: los genera la orden de trabajo al agregarle un repuesto.
  *
  * No hay edición ni borrado: un movimiento es historial, y un error se
@@ -51,7 +51,7 @@ export class StockMovementsController {
   constructor(private readonly stockMovements: StockMovementsService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiPaginatedResponse(StockMovement)
   @ApiBadRequestResponse({
     description: 'La fecha desde es posterior a la fecha hasta',
@@ -70,16 +70,16 @@ export class StockMovementsController {
   }
 
   @Get(':stockMovementId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(StockMovement)
   @ApiNotFoundResponse({ description: 'No se encontró el movimiento' })
   async findOne(
-    @Param('stockMovementId', ParseIdPipe) stockMovementId: string,
+    @Param('stockMovementId', ParseIdPipe) movimientoStockId: string,
     @CurrentUser() user: SessionUser,
   ): Promise<BaseResponseDto<StockMovement>> {
     return BaseResponseDto.success(
       new StockMovement(
-        await this.stockMovements.findOne(stockMovementId),
+        await this.stockMovements.findOne(movimientoStockId),
         costsFor(user),
       ),
       'Movimiento obtenido',
@@ -87,7 +87,7 @@ export class StockMovementsController {
   }
 
   @Post('purchases')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(StockMovement, { status: HttpStatus.CREATED })
   @ApiBadRequestResponse({ description: 'El producto está inactivo' })
   @ApiNotFoundResponse({ description: 'No se encontró el producto' })
@@ -97,7 +97,7 @@ export class StockMovementsController {
   ): Promise<BaseResponseDto<StockMovement>> {
     return BaseResponseDto.success(
       new StockMovement(
-        await this.stockMovements.purchase(dto, user.userId),
+        await this.stockMovements.purchase(dto, user.usuarioId),
         WITH_COSTS,
       ),
       'Compra registrada',
@@ -106,7 +106,7 @@ export class StockMovementsController {
   }
 
   @Post('adjustments')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(StockMovement, { status: HttpStatus.CREATED })
   @ApiBadRequestResponse({ description: 'El producto está inactivo' })
   @ApiNotFoundResponse({ description: 'No se encontró el producto' })
@@ -119,7 +119,7 @@ export class StockMovementsController {
   ): Promise<BaseResponseDto<StockMovement>> {
     return BaseResponseDto.success(
       new StockMovement(
-        await this.stockMovements.adjust(dto, user.userId),
+        await this.stockMovements.adjust(dto, user.usuarioId),
         WITH_COSTS,
       ),
       'Ajuste registrado',

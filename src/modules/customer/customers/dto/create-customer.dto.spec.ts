@@ -14,22 +14,22 @@ async function errorsOf(body: Record<string, unknown>) {
 }
 
 const valid = {
-  documentType: 'DNI',
-  documentNumber: '45678912',
-  name: 'Juan Pérez',
-  phone: '987 654 321',
+  tipoDocumento: 'DNI',
+  numeroDocumento: '45678912',
+  nombre: 'Juan Pérez',
+  telefono: '987 654 321',
 };
 
 describe('CreateCustomerDto', () => {
   it('normaliza el documento y el teléfono', async () => {
     const { dto, messages } = await errorsOf({
       ...valid,
-      documentType: 'RUC',
-      documentNumber: '20-123456789 ',
+      tipoDocumento: 'RUC',
+      numeroDocumento: '20-123456789 ',
     });
     expect(messages).toEqual([]);
-    expect(dto.documentNumber).toBe('20123456789');
-    expect(dto.phone).toBe('987654321');
+    expect(dto.numeroDocumento).toBe('20123456789');
+    expect(dto.telefono).toBe('987654321');
   });
 
   it.each([
@@ -42,11 +42,11 @@ describe('CreateCustomerDto', () => {
     ['CE', 'AB1', 'El carné de extranjería tiene de 6 a 12 letras o dígitos'],
   ])(
     'rechaza un %s mal formado',
-    async (documentType, documentNumber, message) => {
+    async (tipoDocumento, numeroDocumento, message) => {
       const { messages } = await errorsOf({
         ...valid,
-        documentType,
-        documentNumber,
+        tipoDocumento,
+        numeroDocumento,
       });
       expect(messages).toEqual([message]);
     },
@@ -55,11 +55,11 @@ describe('CreateCustomerDto', () => {
   it('deja vacíos los opcionales que llegan en blanco', async () => {
     const { dto, messages } = await errorsOf({
       ...valid,
-      email: '  ',
-      notes: '',
+      correo: '  ',
+      notas: '',
     });
     expect(messages).toEqual([]);
-    expect(dto.email).toBeNull();
-    expect(dto.notes).toBeNull();
+    expect(dto.correo).toBeNull();
+    expect(dto.notas).toBeNull();
   });
 });

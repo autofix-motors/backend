@@ -6,14 +6,14 @@ import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 /** Desde dónde se abrió la sesión. Solo informativo. */
 export interface SessionOrigin {
   ip?: string;
-  userAgent?: string;
+  agenteUsuario?: string;
 }
 
 /**
  * De quién es una sesión: un usuario del personal o la cuenta de un cliente.
- * Es exactamente uno de los dos (lo asegura el CHECK de `core_session`).
+ * Es exactamente uno de los dos (lo asegura el CHECK de `sesion`).
  */
-export type SessionOwner = { userId: string } | { customerAccountId: string };
+export type SessionOwner = { usuarioId: string } | { cuentaClienteId: string };
 
 const SESSION_EXPIRED = 'Tu sesión expiró. Vuelve a iniciar sesión';
 
@@ -40,17 +40,17 @@ export class SessionsService {
   async create(
     owner: SessionOwner,
     origin: SessionOrigin,
-    familyId: string = randomUUID(),
+    familiaId: string = randomUUID(),
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
-    await this.prisma.session.create({
+    await this.prisma.sesion.create({
       data: {
         ...ownerColumns(owner),
-        familyId,
-        tokenHash: hashToken(token),
-        expiresAt: this.expiration(),
+        familiaId,
+        hashToken: hashToken(token),
+        expiraEn: this.expiration(),
         ip: origin.ip,
-        userAgent: origin.userAgent,
+        agenteUsuario: origin.agenteUsuario,
       },
     });
     return token;
@@ -63,67 +63,67 @@ export class SessionsService {
   async rotate(
     token: string,
     origin: SessionOrigin,
-  ): Promise<{ owner: SessionOwner; familyId: string; token: string }> {
-    const session = await this.prisma.session.findUnique({
-      where: { tokenHash: hashToken(token) },
+  ): Promise<{ dueno: SessionOwner; familiaId: string; token: string }> {
+    const session = await this.prisma.sesion.findUnique({
+      where: { hashToken: hashToken(token) },
     });
     if (!session) throw new UnauthorizedException(SESSION_EXPIRED);
 
-    if (session.revokedAt) {
+    if (session.revocadaEn) {
       // Un token ya usado vuelve a aparecer: lo tiene alguien más. Se corta la
       // familia completa, también la sesión del dueño legítimo, que tendrá que
       // volver a entrar.
-      await this.revokeFamily(session.familyId);
+      await this.revokeFamily(session.familiaId);
       throw new UnauthorizedException(SESSION_EXPIRED);
     }
-    if (session.expiresAt <= new Date()) {
+    if (session.expiraEn <= new Date()) {
       throw new UnauthorizedException(SESSION_EXPIRED);
     }
     const owner = sessionOwner(session);
 
     const newToken = randomBytes(32).toString('base64url');
     await this.prisma.$transaction(async (tx) => {
-      // Se revoca con la condición `revokedAt: null` para que dos refrescos
+      // Se revoca con la condición `revocadaEn: null` para que dos refrescos
       // simultáneos con el mismo token no pasen los dos: el segundo no
       // actualiza nada y se trata como reuso.
-      const revoked = await tx.session.updateMany({
-        where: { sessionId: session.sessionId, revokedAt: null },
-        data: { revokedAt: new Date() },
+      const revoked = await tx.sesion.updateMany({
+        where: { sesionId: session.sesionId, revocadaEn: null },
+        data: { revocadaEn: new Date() },
       });
       if (revoked.count === 0) {
         throw new UnauthorizedException(SESSION_EXPIRED);
       }
-      const created = await tx.session.create({
+      const created = await tx.sesion.create({
         data: {
           ...ownerColumns(owner),
-          familyId: session.familyId,
-          tokenHash: hashToken(newToken),
-          expiresAt: this.expiration(),
+          familiaId: session.familiaId,
+          hashToken: hashToken(newToken),
+          expiraEn: this.expiration(),
           ip: origin.ip,
-          userAgent: origin.userAgent,
+          agenteUsuario: origin.agenteUsuario,
         },
       });
-      await tx.session.update({
-        where: { sessionId: session.sessionId },
-        data: { replacedById: created.sessionId },
+      await tx.sesion.update({
+        where: { sesionId: session.sesionId },
+        data: { reemplazadaPorId: created.sesionId },
       });
     });
 
-    return { owner, familyId: session.familyId, token: newToken };
+    return { dueno: owner, familiaId: session.familiaId, token: newToken };
   }
 
   /** Cierra una sesión. Un token desconocido o ya revocado no es un error. */
   async revoke(token: string): Promise<void> {
-    await this.prisma.session.updateMany({
-      where: { tokenHash: hashToken(token), revokedAt: null },
-      data: { revokedAt: new Date() },
+    await this.prisma.sesion.updateMany({
+      where: { hashToken: hashToken(token), revocadaEn: null },
+      data: { revocadaEn: new Date() },
     });
   }
 
-  async revokeFamily(familyId: string): Promise<void> {
-    await this.prisma.session.updateMany({
-      where: { familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+  async revokeFamily(familiaId: string): Promise<void> {
+    await this.prisma.sesion.updateMany({
+      where: { familiaId, revocadaEn: null },
+      data: { revocadaEn: new Date() },
     });
   }
 
@@ -134,9 +134,9 @@ export class SessionsService {
    * (ACCESS_TOKEN_MINUTES).
    */
   async revokeAll(owner: SessionOwner): Promise<void> {
-    await this.prisma.session.updateMany({
-      where: { ...ownerColumns(owner), revokedAt: null },
-      data: { revokedAt: new Date() },
+    await this.prisma.sesion.updateMany({
+      where: { ...ownerColumns(owner), revocadaEn: null },
+      data: { revocadaEn: new Date() },
     });
   }
 
@@ -144,10 +144,10 @@ export class SessionsService {
    * Cierra las sesiones del portal de un cliente, si tiene acceso: al
    * desactivarlo. Customers conoce al cliente, no su cuenta.
    */
-  async revokeAllForCustomer(customerId: string): Promise<void> {
-    await this.prisma.session.updateMany({
-      where: { customerAccount: { customerId }, revokedAt: null },
-      data: { revokedAt: new Date() },
+  async revokeAllForCustomer(clienteId: string): Promise<void> {
+    await this.prisma.sesion.updateMany({
+      where: { cuentaCliente: { clienteId }, revocadaEn: null },
+      data: { revocadaEn: new Date() },
     });
   }
 
@@ -164,21 +164,21 @@ export function hashToken(token: string): string {
 
 /** Las columnas de la fila para un dueño: una llena y la otra vacía. */
 function ownerColumns(owner: SessionOwner): {
-  userId: string | null;
-  customerAccountId: string | null;
+  usuarioId: string | null;
+  cuentaClienteId: string | null;
 } {
-  return 'userId' in owner
-    ? { userId: owner.userId, customerAccountId: null }
-    : { userId: null, customerAccountId: owner.customerAccountId };
+  return 'usuarioId' in owner
+    ? { usuarioId: owner.usuarioId, cuentaClienteId: null }
+    : { usuarioId: null, cuentaClienteId: owner.cuentaClienteId };
 }
 
 function sessionOwner(session: {
-  userId: string | null;
-  customerAccountId: string | null;
+  usuarioId: string | null;
+  cuentaClienteId: string | null;
 }): SessionOwner {
-  if (session.userId) return { userId: session.userId };
-  if (session.customerAccountId) {
-    return { customerAccountId: session.customerAccountId };
+  if (session.usuarioId) return { usuarioId: session.usuarioId };
+  if (session.cuentaClienteId) {
+    return { cuentaClienteId: session.cuentaClienteId };
   }
   // El CHECK de la tabla lo impide; si pasara, la sesión no sirve.
   throw new UnauthorizedException(SESSION_EXPIRED);

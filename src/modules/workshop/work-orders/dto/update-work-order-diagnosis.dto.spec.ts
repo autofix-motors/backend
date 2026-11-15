@@ -33,24 +33,24 @@ describe('UpdateWorkOrderDiagnosisDto', () => {
   });
 
   it('null o texto vacío lo borran; el texto se recorta', async () => {
-    for (const diagnosis of [null, '   ']) {
+    for (const diagnostico of [null, '   ']) {
       const { dto, messages } = await check(UpdateWorkOrderDiagnosisDto, {
-        diagnosis,
+        diagnostico,
       });
       expect(messages).toEqual([]);
-      expect(dto.diagnosis).toBeNull();
+      expect(dto.diagnostico).toBeNull();
     }
     const { dto } = await check(UpdateWorkOrderDiagnosisDto, {
-      diagnosis: ' Pastillas gastadas ',
+      diagnostico: ' Pastillas gastadas ',
     });
-    expect(dto.diagnosis).toBe('Pastillas gastadas');
+    expect(dto.diagnostico).toBe('Pastillas gastadas');
   });
 
   it('hasta 4000 caracteres', async () => {
     expect(
       (
         await check(UpdateWorkOrderDiagnosisDto, {
-          diagnosis: 'x'.repeat(4001),
+          diagnostico: 'x'.repeat(4001),
         })
       ).messages,
     ).toEqual(['El diagnóstico tiene como máximo 4000 caracteres']);

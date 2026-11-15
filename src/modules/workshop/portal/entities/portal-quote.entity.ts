@@ -1,56 +1,56 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  DecisionChannel,
-  QuoteStatus,
+  CanalDecision,
+  EstadoPresupuesto,
 } from '../../../../generated/prisma/enums.js';
 import type { QuoteWithRelations } from '../../work-orders/entities/quote.entity.js';
 import { PortalLine } from './portal-line.entity.js';
 
 /**
- * Una versión del presupuesto, como la ve el cliente: el total, sus ítems y su
+ * Una versión del presupuesto, como la ve el cliente: el total, sus detalles y su
  * respuesta. Sin quién la envió ni quién registró la respuesta.
  */
 export class PortalQuote {
-  constructor(quote: QuoteWithRelations) {
-    this.quoteId = quote.quoteId;
-    this.version = quote.version;
-    this.status = quote.status;
-    this.total = quote.total.toFixed(2);
-    this.sentAt = quote.sentAt;
-    this.decidedAt = quote.decidedAt;
-    this.decisionChannel = quote.decisionChannel;
-    this.decisionNote = quote.decisionNote;
-    this.items = quote.items.map((item) => new PortalLine(item));
+  constructor(presupuesto: QuoteWithRelations) {
+    this.presupuestoId = presupuesto.presupuestoId;
+    this.version = presupuesto.version;
+    this.estado = presupuesto.estado;
+    this.total = presupuesto.total.toFixed(2);
+    this.enviadoEn = presupuesto.enviadoEn;
+    this.decididoEn = presupuesto.decididoEn;
+    this.canalDecision = presupuesto.canalDecision;
+    this.notaDecision = presupuesto.notaDecision;
+    this.detalles = presupuesto.detalles.map((item) => new PortalLine(item));
   }
 
   @ApiProperty({ format: 'uuid' })
-  quoteId: string;
+  presupuestoId: string;
 
   @ApiProperty({ example: 2 })
   version: number;
 
-  @ApiProperty({ enum: QuoteStatus, enumName: 'QuoteStatus' })
-  status: QuoteStatus;
+  @ApiProperty({ enum: EstadoPresupuesto, enumName: 'EstadoPresupuesto' })
+  estado: EstadoPresupuesto;
 
   @ApiProperty({ example: '450.00' })
   total: string;
 
   @ApiProperty({ format: 'date-time' })
-  sentAt: Date;
+  enviadoEn: Date;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  decidedAt: Date | null;
+  decididoEn: Date | null;
 
   @ApiProperty({
-    enum: DecisionChannel,
-    enumName: 'DecisionChannel',
+    enum: CanalDecision,
+    enumName: 'CanalDecision',
     nullable: true,
   })
-  decisionChannel: DecisionChannel | null;
+  canalDecision: CanalDecision | null;
 
   @ApiProperty({ type: String, nullable: true })
-  decisionNote: string | null;
+  notaDecision: string | null;
 
   @ApiProperty({ type: [PortalLine], description: 'Como estaban al enviarlo' })
-  items: PortalLine[];
+  detalles: PortalLine[];
 }

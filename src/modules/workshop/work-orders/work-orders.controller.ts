@@ -23,9 +23,9 @@ import { CurrentUser } from '../../../core/decorators/current-user.decorator.js'
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
 import {
-  ItemType,
-  QuoteStatus,
-  UserRole,
+  TipoDetalle,
+  EstadoPresupuesto,
+  RolUsuario,
 } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
@@ -55,11 +55,11 @@ const NOT_FOUND_DESCRIPTION = 'No existe, o el mecánico no la tiene asignada';
 
 /**
  * La orden completa que responde cada endpoint. El costo y el margen de los
- * repuestos salen solo para ADMIN.
+ * repuestos salen solo para ADMINISTRADOR.
  */
 function detail(order: WorkOrderWithTimeline, actor: SessionUser) {
   return new WorkOrderDetail(order, {
-    includeCosts: actor.role === UserRole.ADMIN,
+    incluirCostos: actor.rol === RolUsuario.ADMINISTRADOR,
   });
 }
 
@@ -80,7 +80,7 @@ export class WorkOrdersController {
   ) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiPaginatedResponse(WorkOrder)
   async findAll(
     @Query() query: ListWorkOrdersQueryDto,
@@ -96,21 +96,21 @@ export class WorkOrdersController {
   }
 
   @Get(':workOrderId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiNotFoundResponse({ description: NOT_FOUND_DESCRIPTION })
   async findOne(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     return BaseResponseDto.success(
-      detail(await this.workOrders.findOne(workOrderId, actor), actor),
+      detail(await this.workOrders.findOne(ordenTrabajoId, actor), actor),
       'Orden de trabajo obtenida',
     );
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(WorkOrderDetail, { status: HttpStatus.CREATED })
   @ApiBadRequestResponse({
     description:
@@ -134,7 +134,7 @@ export class WorkOrdersController {
   }
 
   @Patch(':workOrderId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiBadRequestResponse({
     description: 'El mecánico está inactivo, o la fecha prometida ya pasó',
@@ -142,42 +142,42 @@ export class WorkOrdersController {
   @ApiNotFoundResponse({ description: 'No se encontró la orden o el usuario' })
   @ApiConflictResponse({ description: 'La orden ya se entregó o se canceló' })
   async update(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: UpdateWorkOrderDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     return BaseResponseDto.success(
-      detail(await this.workOrders.update(workOrderId, dto, actor), actor),
+      detail(await this.workOrders.update(ordenTrabajoId, dto, actor), actor),
       'Orden de trabajo actualizada',
     );
   }
 
   @Put(':workOrderId/diagnosis')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiNotFoundResponse({ description: NOT_FOUND_DESCRIPTION })
   @ApiConflictResponse({
     description: 'La orden no está en un estado en que se diagnostique',
   })
   async updateDiagnosis(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: UpdateWorkOrderDiagnosisDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     const order = await this.workOrders.updateDiagnosis(
-      workOrderId,
+      ordenTrabajoId,
       dto,
       actor,
     );
     return BaseResponseDto.success(
       detail(order, actor),
-      order.diagnosis ? 'Diagnóstico guardado' : 'Diagnóstico borrado',
+      order.diagnostico ? 'Diagnóstico guardado' : 'Diagnóstico borrado',
     );
   }
 
   @Post(':workOrderId/status')
   @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiBadRequestResponse({ description: 'Cancelar exige el motivo en la nota' })
   @ApiForbiddenResponse({
@@ -189,29 +189,33 @@ export class WorkOrdersController {
       'Desde su estado actual la orden no puede pasar al pedido, o cambió mientras tanto',
   })
   async changeStatus(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: ChangeWorkOrderStatusDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
-    const order = await this.workOrders.changeStatus(workOrderId, dto, actor);
+    const order = await this.workOrders.changeStatus(
+      ordenTrabajoId,
+      dto,
+      actor,
+    );
     return BaseResponseDto.success(
       detail(order, actor),
-      `Orden en «${WORK_ORDER_STATUS_LABELS[order.status]}»`,
+      `Orden en «${WORK_ORDER_STATUS_LABELS[order.estado]}»`,
     );
   }
 
   @Post(':workOrderId/notes')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail, { status: HttpStatus.CREATED })
   @ApiNotFoundResponse({ description: NOT_FOUND_DESCRIPTION })
   async addNote(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: CreateWorkOrderNoteDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     return BaseResponseDto.success(
-      detail(await this.workOrders.addNote(workOrderId, dto, actor), actor),
-      dto.isPublic
+      detail(await this.workOrders.addNote(ordenTrabajoId, dto, actor), actor),
+      dto.esPublico
         ? 'Nota agregada (la ve el cliente)'
         : 'Nota interna agregada',
       HttpStatus.CREATED,
@@ -219,11 +223,11 @@ export class WorkOrdersController {
   }
 
   @Post(':workOrderId/items')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail, { status: HttpStatus.CREATED })
   @ApiBadRequestResponse({
     description:
-      'El servicio o el repuesto está inactivo, o el ítem trae datos del otro tipo',
+      'El servicio o el repuesto está inactivo, o el detalle trae datos del otro tipo',
   })
   @ApiForbiddenResponse({
     description: 'El mecánico no fija el precio ni la descripción',
@@ -233,22 +237,24 @@ export class WorkOrdersController {
   })
   @ApiConflictResponse({
     description:
-      'La orden no está en un estado en que se cambien sus ítems, cambió mientras tanto, o no alcanza el stock',
+      'La orden no está en un estado en que se cambien sus detalles, cambió mientras tanto, o no alcanza el stock',
   })
   async addItem(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: CreateWorkOrderItemDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     return BaseResponseDto.success(
-      detail(await this.items.create(workOrderId, dto, actor), actor),
-      dto.type === ItemType.PRODUCT ? 'Repuesto agregado' : 'Servicio agregado',
+      detail(await this.items.create(ordenTrabajoId, dto, actor), actor),
+      dto.tipo === TipoDetalle.PRODUCTO
+        ? 'Repuesto agregado'
+        : 'Servicio agregado',
       HttpStatus.CREATED,
     );
   }
 
   @Patch(':workOrderId/items/:workOrderItemId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiBadRequestResponse({
     description: 'La cantidad de un repuesto no se cambia',
@@ -257,74 +263,74 @@ export class WorkOrdersController {
     description: 'El mecánico no fija el precio ni la descripción',
   })
   @ApiNotFoundResponse({
-    description: `${NOT_FOUND_DESCRIPTION}; o el ítem no es de esta orden`,
+    description: `${NOT_FOUND_DESCRIPTION}; o el detalle no es de esta orden`,
   })
   @ApiConflictResponse({
     description:
-      'La orden no está en un estado en que se cambien sus ítems, o cambió mientras tanto',
+      'La orden no está en un estado en que se cambien sus detalles, o cambió mientras tanto',
   })
   async updateItem(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
-    @Param('workOrderItemId', ParseIdPipe) workOrderItemId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
+    @Param('workOrderItemId', ParseIdPipe) detalleOrdenId: string,
     @Body() dto: UpdateWorkOrderItemDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
     return BaseResponseDto.success(
       detail(
-        await this.items.update(workOrderId, workOrderItemId, dto, actor),
+        await this.items.update(ordenTrabajoId, detalleOrdenId, dto, actor),
         actor,
       ),
-      'Ítem actualizado',
+      'Detalle actualizado',
     );
   }
 
   @Delete(':workOrderId/items/:workOrderItemId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @HttpCode(HttpStatus.OK)
   @ApiBaseResponse(null, {
-    description: 'Ítem quitado; si es un repuesto, vuelve al stock',
+    description: 'Detalle quitado; si es un repuesto, vuelve al stock',
   })
   @ApiNotFoundResponse({
-    description: `${NOT_FOUND_DESCRIPTION}; o el ítem no es de esta orden`,
+    description: `${NOT_FOUND_DESCRIPTION}; o el detalle no es de esta orden`,
   })
   @ApiConflictResponse({
     description:
-      'La orden no está en un estado en que se cambien sus ítems, o cambió mientras tanto',
+      'La orden no está en un estado en que se cambien sus detalles, o cambió mientras tanto',
   })
   async removeItem(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
-    @Param('workOrderItemId', ParseIdPipe) workOrderItemId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
+    @Param('workOrderItemId', ParseIdPipe) detalleOrdenId: string,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<null>> {
-    await this.items.remove(workOrderId, workOrderItemId, actor);
-    return BaseResponseDto.success(null, 'Ítem quitado de la orden');
+    await this.items.remove(ordenTrabajoId, detalleOrdenId, actor);
+    return BaseResponseDto.success(null, 'Detalle quitado de la orden');
   }
 
   @Post(':workOrderId/quotes')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(WorkOrderDetail, { status: HttpStatus.CREATED })
-  @ApiBadRequestResponse({ description: 'La orden no tiene ítems' })
+  @ApiBadRequestResponse({ description: 'La orden no tiene detalles' })
   @ApiNotFoundResponse({ description: 'No se encontró la orden' })
   @ApiConflictResponse({
     description:
       'La orden no está en diagnóstico, en reparación ni esperando repuestos, o cambió mientras tanto',
   })
   async sendQuote(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
     @Body() dto: CreateQuoteDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
-    const order = await this.quotes.send(workOrderId, dto, actor);
+    const order = await this.quotes.send(ordenTrabajoId, dto, actor);
     return BaseResponseDto.success(
       detail(order, actor),
-      `Presupuesto v${order.quotes[0].version} enviado: la orden espera la aprobación del cliente`,
+      `Presupuesto v${order.presupuestos[0].version} enviado: la orden espera la aprobación del cliente`,
       HttpStatus.CREATED,
     );
   }
 
   @Post(':workOrderId/quotes/:quoteId/decision')
   @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(WorkOrderDetail)
   @ApiNotFoundResponse({
     description: 'No se encontró la orden, o el presupuesto no es de ella',
@@ -334,32 +340,37 @@ export class WorkOrdersController {
       'El presupuesto ya se decidió o fue reemplazado, la orden no espera aprobación, o cambió mientras tanto',
   })
   async decideQuote(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
-    @Param('quoteId', ParseIdPipe) quoteId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
+    @Param('quoteId', ParseIdPipe) presupuestoId: string,
     @Body() dto: DecideQuoteDto,
     @CurrentUser() actor: SessionUser,
   ): Promise<BaseResponseDto<WorkOrderDetail>> {
-    const order = await this.quotes.decide(workOrderId, quoteId, dto, actor);
+    const order = await this.quotes.decide(
+      ordenTrabajoId,
+      presupuestoId,
+      dto,
+      actor,
+    );
     return BaseResponseDto.success(
       detail(order, actor),
-      dto.decision === QuoteStatus.APPROVED
+      dto.decision === EstadoPresupuesto.APROBADO
         ? 'Presupuesto aprobado: la orden pasa a reparación'
         : 'Presupuesto rechazado: la orden vuelve a diagnóstico',
     );
   }
 
   @Delete(':workOrderId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @HttpCode(HttpStatus.OK)
   @ApiBaseResponse(null, { description: 'Orden de trabajo eliminada' })
   @ApiNotFoundResponse({ description: 'No se encontró la orden' })
   @ApiConflictResponse({
-    description: 'La orden tiene ítems, presupuestos o pagos: se cancela',
+    description: 'La orden tiene detalles o presupuestos: se cancela',
   })
   async remove(
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.workOrders.remove(workOrderId);
+    await this.workOrders.remove(ordenTrabajoId);
     return BaseResponseDto.success(null, 'Orden de trabajo eliminada');
   }
 }

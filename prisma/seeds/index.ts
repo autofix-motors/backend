@@ -13,7 +13,7 @@ import { seedWorkshop } from './workshop.seed.js';
 //
 // Siembran solo lo que la aplicación necesita para arrancar -el primer
 // administrador y los catálogos base del taller (servicios, repuestos con su
-// stock inicial, herramientas)-, no datos de prueba: ni clientes, ni
+// stock inicial)-, no datos de prueba: ni clientes, ni
 // vehículos, ni órdenes. Los datos de prueba son de los tests.
 
 const adapter = new PrismaPg({

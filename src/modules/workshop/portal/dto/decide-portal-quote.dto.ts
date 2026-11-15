@@ -7,5 +7,5 @@ import { DecideQuoteDto } from '../../work-orders/dto/decide-quote.dto.js';
  */
 export class DecidePortalQuoteDto extends PickType(DecideQuoteDto, [
   'decision',
-  'note',
+  'nota',
 ] as const) {}

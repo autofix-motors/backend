@@ -13,10 +13,10 @@ import { normalizeLoginIdentifier } from '../auth/login-identifier.js';
 @Injectable()
 export class LoginThrottlerGuard extends ThrottlerGuard {
   protected override getTracker(req: Record<string, any>): Promise<string> {
-    const identifier: unknown = req.body?.identifier;
+    const identifier: unknown = req.body?.identificador;
     const key =
       typeof identifier === 'string'
-        ? normalizeLoginIdentifier(identifier).value
+        ? normalizeLoginIdentifier(identifier).valor
         : '';
     return Promise.resolve(`${req.ip}:${req.path}:${key}`);
   }

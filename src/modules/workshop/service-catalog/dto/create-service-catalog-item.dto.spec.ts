@@ -13,7 +13,7 @@ async function errorsOf(body: Record<string, unknown>) {
   };
 }
 
-const valid = { name: 'Afinamiento', laborPrice: '180.00' };
+const valid = { nombre: 'Afinamiento', precioManoObra: '180.00' };
 
 describe('CreateServiceCatalogItemDto', () => {
   it.each([
@@ -22,11 +22,14 @@ describe('CreateServiceCatalogItemDto', () => {
     [120.5, '120.5'],
     [0, '0'],
     ['99999999.99', '99999999.99'],
-  ])('acepta el precio %j y lo deja como texto', async (laborPrice, text) => {
-    const { dto, messages } = await errorsOf({ ...valid, laborPrice });
-    expect(messages).toEqual([]);
-    expect(dto.laborPrice).toBe(text);
-  });
+  ])(
+    'acepta el precio %j y lo deja como texto',
+    async (precioManoObra, text) => {
+      const { dto, messages } = await errorsOf({ ...valid, precioManoObra });
+      expect(messages).toEqual([]);
+      expect(dto.precioManoObra).toBe(text);
+    },
+  );
 
   it.each([
     ['12.345', 'El precio de mano de obra tiene como máximo 2 decimales'],
@@ -48,28 +51,28 @@ describe('CreateServiceCatalogItemDto', () => {
     ],
     ['', 'Ingresa el precio de mano de obra'],
     [undefined, 'Ingresa el precio de mano de obra'],
-  ])('rechaza el precio %j', async (laborPrice, message) => {
-    const { messages } = await errorsOf({ ...valid, laborPrice });
+  ])('rechaza el precio %j', async (precioManoObra, message) => {
+    const { messages } = await errorsOf({ ...valid, precioManoObra });
     expect(messages).toEqual([message]);
   });
 
   it('recorta el nombre y deja vacía la descripción en blanco', async () => {
     const { dto, messages } = await errorsOf({
       ...valid,
-      name: '  Lavado de motor ',
-      description: '   ',
+      nombre: '  Lavado de motor ',
+      descripcion: '   ',
     });
     expect(messages).toEqual([]);
-    expect(dto.name).toBe('Lavado de motor');
-    expect(dto.description).toBeNull();
+    expect(dto.nombre).toBe('Lavado de motor');
+    expect(dto.descripcion).toBeNull();
   });
 
   it('rechaza un nombre vacío o demasiado largo', async () => {
-    expect((await errorsOf({ ...valid, name: '  ' })).messages).toEqual([
+    expect((await errorsOf({ ...valid, nombre: '  ' })).messages).toEqual([
       'Ingresa el nombre del servicio',
     ]);
     expect(
-      (await errorsOf({ ...valid, name: 'x'.repeat(121) })).messages,
+      (await errorsOf({ ...valid, nombre: 'x'.repeat(121) })).messages,
     ).toEqual(['El nombre tiene como máximo 120 caracteres']);
   });
 });

@@ -15,30 +15,30 @@ async function errorsOf(query: Record<string, string>) {
 describe('ListProductsQueryDto', () => {
   it('convierte el estado y el stock bajo, y ordena por nombre por defecto', async () => {
     const { dto, messages } = await errorsOf({
-      kind: 'SUPPLY',
-      isActive: 'true',
-      lowStock: 'false',
+      tipo: 'INSUMO',
+      activo: 'true',
+      stockBajo: 'false',
     });
     expect(messages).toEqual([]);
     expect(dto).toMatchObject({
-      kind: 'SUPPLY',
-      isActive: true,
-      lowStock: false,
-      sortBy: 'name',
-      sortOrder: 'asc',
+      tipo: 'INSUMO',
+      activo: true,
+      stockBajo: false,
+      ordenarPor: 'nombre',
+      sentido: 'asc',
     });
   });
 
   it('rechaza un tipo, un filtro de stock y un orden que no existen', async () => {
     const { messages } = await errorsOf({
-      kind: 'TOOL',
-      lowStock: 'si',
-      sortBy: 'cost',
+      tipo: 'HERRAMIENTA',
+      stockBajo: 'si',
+      ordenarPor: 'costo',
     });
     expect(messages).toEqual([
-      'El tipo es PART o SUPPLY',
+      'El tipo es REPUESTO o INSUMO',
       'El filtro de stock bajo es true o false',
-      'Se ordena por name, code, stock o price',
+      'Se ordena por nombre, codigo, stock o precio',
     ]);
   });
 });

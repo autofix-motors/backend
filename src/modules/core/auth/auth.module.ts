@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { CustomersModule } from '../../customer/customers/customers.module.js';
 import { CustomerAccountsModule } from '../customer-accounts/customer-accounts.module.js';
 import { SessionsModule } from '../sessions/sessions.module.js';
+import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 
@@ -35,6 +36,9 @@ import { AuthService } from './auth.service.js';
     // (invariante 3).
     CustomerAccountsModule,
     CustomersModule,
+    // «Mi perfil» del personal lee al usuario por su service. No forma ciclo:
+    // UsersModule solo importa SessionsModule.
+    UsersModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

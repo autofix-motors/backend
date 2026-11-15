@@ -16,8 +16,8 @@ import {
 } from '../../../../core/validation/quantity.js';
 import { TrimToNull } from '../../../../core/validation/trim-to-null.transform.js';
 import {
-  ProductKind,
-  UnitOfMeasure,
+  TipoProducto,
+  UnidadMedida,
 } from '../../../../generated/prisma/enums.js';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -47,26 +47,26 @@ export class CreateProductDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa el código' })
-  code: string;
+  codigo: string;
 
   @ApiProperty({ example: 'Filtro de aceite Toyota Yaris', maxLength: 150 })
   @Transform(trim)
   @MaxLength(150, { message: 'El nombre tiene como máximo 150 caracteres' })
   @IsNotEmpty({ message: 'Ingresa el nombre del producto' })
   @IsString({ message: 'Ingresa el nombre del producto' })
-  name: string;
+  nombre: string;
 
-  @ApiProperty({ enum: ProductKind, enumName: 'ProductKind' })
-  @IsEnum(ProductKind, {
-    message: 'El tipo es PART (repuesto) o SUPPLY (insumo)',
+  @ApiProperty({ enum: TipoProducto, enumName: 'TipoProducto' })
+  @IsEnum(TipoProducto, {
+    message: 'El tipo es REPUESTO o INSUMO',
   })
-  kind: ProductKind;
+  tipo: TipoProducto;
 
-  @ApiProperty({ enum: UnitOfMeasure, enumName: 'UnitOfMeasure' })
-  @IsEnum(UnitOfMeasure, {
-    message: 'La unidad es UNIT, LITER, GALLON, KIT o METER',
+  @ApiProperty({ enum: UnidadMedida, enumName: 'UnidadMedida' })
+  @IsEnum(UnidadMedida, {
+    message: 'La unidad es UNIDAD, LITRO, GALON, KIT o METRO',
   })
-  unit: UnitOfMeasure;
+  unidad: UnidadMedida;
 
   @ApiPropertyOptional({
     type: String,
@@ -78,7 +78,7 @@ export class CreateProductDto {
   @TrimToNull()
   @MaxLength(60, { message: 'La marca tiene como máximo 60 caracteres' })
   @IsString({ message: 'La marca tiene que ser texto' })
-  brand?: string | null;
+  marca?: string | null;
 
   @ApiProperty({
     oneOf: [
@@ -91,7 +91,7 @@ export class CreateProductDto {
   @ToQuantityText()
   @IsQuantity('El stock mínimo')
   @IsNotEmpty({ message: 'Ingresa el stock mínimo' })
-  minStock: string;
+  stockMinimo: string;
 
   @ApiProperty({
     oneOf: [
@@ -106,7 +106,7 @@ export class CreateProductDto {
   @ToMoneyText()
   @IsMoney('El costo')
   @IsNotEmpty({ message: 'Ingresa el costo' })
-  cost: string;
+  costo: string;
 
   @ApiProperty({
     oneOf: [
@@ -119,12 +119,12 @@ export class CreateProductDto {
   @ToMoneyText()
   @IsMoney('El precio de venta')
   @IsNotEmpty({ message: 'Ingresa el precio de venta' })
-  price: string;
+  precio: string;
 
   @ApiPropertyOptional({ default: true })
   // Opcional pero no anulable: con @IsOptional un `null` pasaría sin validar y
   // la base lo rechazaría con un 500 (la columna no admite vacío).
   @ValidateIf((_dto: CreateProductDto, value: unknown) => value !== undefined)
   @IsBoolean({ message: 'El estado tiene que ser verdadero o falso' })
-  isActive?: boolean;
+  activo?: boolean;
 }

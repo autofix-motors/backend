@@ -1,27 +1,28 @@
 # Alcance del MVP
 
 AutoFix Motors reemplaza el trabajo manual de un taller mecánico: quién trajo
-qué vehículo, qué se le hizo, con qué repuestos, cuánto se cobró y en qué estado
+qué vehículo, qué se le hizo, con qué repuestos, cuánto cuesta y en qué estado
 está. El cliente sigue el avance desde su portal, con la cuenta que le habilita
 el taller (antes: una página pública por código; ver «Seguimiento público»).
 
 Es un proyecto chico a propósito: lo necesario para llevar el seguimiento de los
-servicios y saber cuánto generan. No es un ERP.
+servicios: flujo operativo y de seguimiento. No es un ERP ni lleva la
+contabilidad del taller.
 
 ## Decisiones tomadas
 
 | Tema | Decisión | Por qué |
 |---|---|---|
 | Acceso del cliente al seguimiento | **Código por orden** (aleatorio, ej. `AFM-7K3Q9X`) | La placa sola no sirve: se ve en la calle y cualquiera vería el estado del auto de otro |
-| Dinero | **Pagos por orden + reportes**, sin gastos del taller | Lo que el taller necesita saber es cuánto generan las reparaciones; registrar egresos es otra captura diaria que no se pidió |
+| Dinero | **Sin flujo contable**: ni pagos, ni caja, ni reportes de ingresos. La orden muestra su total y el presupuesto | Cambió en 2026-11 (antes: pagos por orden y reportes): quien dirige el proyecto lo dejó en lo operativo y el seguimiento |
 | Presupuesto | **Lo responde el cliente desde su portal**, o el administrador registra la respuesta que llega por teléfono, WhatsApp o en el taller | Cambió en 2026-10 (antes solo el administrador): el canal «Portal» dice que respondió el propio cliente |
 | Mecánico | **Ve solo sus órdenes asignadas** | El administrador asigna y reasigna; el mecánico no se distrae con lo ajeno |
 
 ## La pieza central: la orden de trabajo
 
 Todo cuelga de la orden de trabajo (OT): el cliente y su vehículo, el mecánico
-asignado, los servicios y repuestos, los cambios de estado —que alimentan el
-seguimiento público— y los pagos —que alimentan los ingresos—.
+asignado, los servicios y repuestos, los presupuestos y los cambios de estado
+—que alimentan el portal del cliente—.
 
 ```
 RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► IN_PROGRESS ⇄ WAITING_PARTS
@@ -49,13 +50,10 @@ Cada cambio de estado guarda fecha, usuario y una nota opcional, marcada como
 | `workshop` | `quotes` | Presupuestos versionados de una OT y la decisión del cliente, registrada por el administrador |
 | `inventory` | `products` | Repuestos e insumos: código, unidad, stock, stock mínimo, costo, precio de venta. Alerta de stock bajo |
 | `inventory` | `stock-movements` | Kardex simple: entrada (compra), salida (consumo en una OT, automática), ajuste |
-| `inventory` | `tools` | Herramientas: código, estado (operativa, en reparación, de baja), mecánico que la tiene |
-| `finance` | `payments` | Pagos por OT: efectivo, Yape/Plin, tarjeta, transferencia. Adelantos y saldo pendiente |
-| `finance` | `reports` | Ingresos por período, por servicio y por mecánico; mano de obra frente a repuestos; margen de repuestos |
 | `workshop` | `portal` | Portal del cliente (reemplaza a `tracking`): sus vehículos, sus órdenes y la respuesta a los presupuestos. Sin tablas propias |
 
 **Inicio (dashboard):** órdenes abiertas por estado, listas para entregar,
-vencidas (pasó la fecha prometida), ingresos del mes (solo ADMIN) y productos con
+vencidas (pasó la fecha prometida) y productos con
 stock bajo.
 
 ## Seguimiento público
@@ -97,7 +95,7 @@ stock bajo.
 | Rol | Puede |
 |---|---|
 | `ADMIN` | Todo, incluido registrar la aprobación o el rechazo de un presupuesto |
-| `MECHANIC` | Ver sus órdenes asignadas, cambiar su estado, agregar notas y los repuestos consumidos; consultar stock y herramientas. No ve pagos, reportes, costos ni márgenes, ni gestiona usuarios |
+| `MECHANIC` | Ver sus órdenes asignadas, cambiar su estado, agregar notas y los repuestos consumidos; consultar stock. No ve costos ni márgenes, ni gestiona usuarios |
 
 ## Fuera del alcance
 
@@ -126,9 +124,10 @@ antes de implementar, y se trabaja en una rama `feature/...` con su PR en
 - [x] **Fase 3 — Portal del cliente** (antes «Seguimiento público»). Acceso
   con cuenta, sus vehículos y órdenes, y la respuesta a los presupuestos.
   Validada el 2026-10-24.
-- [x] **Fase 4 — Inventario.** Productos, movimientos, consumo desde la OT,
-  herramientas.
-- [ ] **Fase 5 — Ingresos.** Pagos por orden, reportes y dashboard de inicio.
+- [x] **Fase 4 — Inventario.** Productos, movimientos y consumo desde la OT
+  (herramientas retiradas en 2026-11: fuera de alcance).
+- [x] ~~Fase 5 — Ingresos~~. Descartada en 2026-11: sin pagos ni reportes de
+  ingresos (fuera de alcance). El inicio con indicadores queda como mejora.
 
 El orden sigue las dependencias: no hay OT sin cliente y vehículo, no hay
-seguimiento sin OT, y los reportes necesitan pagos y repuestos para decir algo.
+seguimiento sin OT.

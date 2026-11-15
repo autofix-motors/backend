@@ -15,10 +15,9 @@ encontrar buscando:
   tutoriales son de Prisma 6 y no aplican.
 - **La versión de Prisma está fijada exacta, y no es un capricho.** Ver abajo.
 
-> **Qué hay hoy.** El modelo de datos completo ya está en `prisma/schema/`
-> (`core`, `customer`, `workshop`, `inventory`, `finance`), pero en `src/` solo
-> existe el grupo `core` (el login). Los ejemplos de módulos —`workshop/work-orders`,
-> sus DTO y services— muestran **cómo se vería** el código; todavía no existe.
+> **Qué hay hoy.** El modelo de datos está en `prisma/schema/` (`core`,
+> `customer`, `workshop`, `inventory`) y cada grupo tiene sus módulos en
+> `src/modules/`. Sin flujo contable desde 2026-11 (no hay pagos ni reportes).
 
 ## Las versiones de Prisma están fijadas a mano
 
@@ -75,9 +74,8 @@ prisma/                       TERRITORIO DE LA HERRAMIENTA
 ├── schema/
 │   ├── core.prisma           usuarios (con su rol) y sesiones
 │   ├── customer.prisma       clientes y vehículos
-│   ├── workshop.prisma       catálogo de servicios, órdenes, eventos, ítems y presupuestos
-│   ├── inventory.prisma      repuestos e insumos, kardex y herramientas
-│   └── finance.prisma        pagos
+│   ├── workshop.prisma       servicios, órdenes, eventos, detalles y presupuestos
+│   └── inventory.prisma      repuestos e insumos y kardex
 ├── migrations/               las genera la CLI. Se commitean
 └── seeds/
     ├── index.ts              orquesta el orden
@@ -137,32 +135,27 @@ en `src/modules/<group>/`, con sus módulos adentro. `core.prisma` ↔
 `modules/core/` (hoy, `auth`); un `workshop.prisma` sería `modules/workshop/`.
 Ver [`Un módulo`](#un-módulo).
 
-### La tabla lleva el nombre de su archivo delante
+### La tabla se llama como la entidad, sin prefijo
 
-El archivo se nombra **en singular** (`core.prisma`, `workshop.prisma`) y ese
-nombre es el **prefijo de cada tabla** que define, también en singular:
+El archivo del schema se nombra por dominio (`core.prisma`, `workshop.prisma`)
+solo para ordenar el código. La tabla lleva el nombre de la entidad, en singular
+y snake_case, **sin prefijo**:
 
 ```prisma
 // workshop.prisma
-model WorkOrder {
+model OrdenTrabajo {
   ...
-  @@map("workshop_work_order")
+  @@map("orden_trabajo")
 }
 ```
 
-- **Tabla = `{archivo}_{entidad}`**, en snake_case: `core_user`,
-  `core_session`, `workshop_vehicle`.
-- **El prefijo va siempre, aunque se repita**: un modelo `Payment` en un
-  `payment.prisma` sería `payment_payment`. Una excepción por caso vuelve
-  ambigua la regla.
-- **El modelo no lleva prefijo**: sigue siendo `User`, y en el código,
-  `this.prisma.user`. El prefijo es de la base.
+- **Tabla = nombre de la entidad**: `usuario`, `sesion`, `cuenta_cliente`,
+  `orden_trabajo`, `detalle_orden`.
 - **Los enums y las columnas no llevan prefijo.**
 
-Todas las tablas están en el schema `public` de Postgres. El prefijo solo sirve
-para que el diagrama ERD agrupe las tablas por dominio: se descartó usar schemas
-de Postgres separados (`core.user`) porque complican permisos y herramientas
-sin aportar nada más que ese orden visual.
+Todas las tablas están en el schema `public` de Postgres. Hasta 2026-11 llevaban
+el prefijo del archivo (`workshop_work_order`); se quitó para que el modelo
+físico se lea sin traducir.
 
 ## Cada modelo dice por qué existe
 
@@ -171,24 +164,24 @@ explicación obliga a adivinar para qué sirve, o a preguntarle a quien lo
 escribió, que para entonces quizá ya no está.
 
 ```prisma
-// Ejemplo inspirado en workshop.prisma (discountRate no existe).
+// Ejemplo inspirado en workshop.prisma (tasaDescuento no existe).
 
 /// Un trabajo que el taller hace sobre un vehículo, desde que entra hasta que
 /// se entrega. Es una entidad aparte del vehículo porque el mismo auto vuelve
 /// muchas veces, y cada visita tiene su propio diagnóstico y su propio cobro.
-model WorkOrder {
-  workOrderId  String   @id @default(uuid()) @map("work_order_id") @db.Uuid
+model OrdenTrabajo {
+  ordenTrabajoId     String   @id @default(uuid()) @map("orden_trabajo_id") @db.Uuid
   /// El kilometraje al recibir el vehículo, en km. Se congela aquí: el del
   /// vehículo cambia con cada visita.
-  mileageIn    Int      @map("mileage_in")
+  kilometrajeIngreso Int      @map("kilometraje_ingreso")
   /// Fracción, no porcentaje: 0.1000 es 10 %.
-  discountRate Decimal? @map("discount_rate") @db.Decimal(5, 4)
+  tasaDescuento      Decimal? @map("tasa_descuento") @db.Decimal(5, 4)
   ...
 }
 ```
 
-`core.prisma` es el ejemplo real: `User` explica por qué los clientes del
-taller no son usuarios, y `Session` por qué existe si ya hay un JWT.
+`core.prisma` es el ejemplo real: `Usuario` explica por qué los clientes del
+taller no son usuarios, y `Sesion` por qué existe si ya hay un JWT.
 
 - **Todo modelo lleva un `///` encima que dice por qué existe**: qué problema del
   negocio resuelve y, si no es obvio, por qué es una entidad aparte y no un campo
@@ -202,12 +195,12 @@ taller no son usuarios, y `Session` por qué existe si ya hay un JWT.
   - una redundancia deliberada;
   - el origen del dato.
 
-  Los campos obvios —`name`, `code`, `createdAt`— no llevan comentario: el
+  Los campos obvios —`nombre`, `codigo`, `creadoEn`— no llevan comentario: el
   ruido esconde lo que importa.
 - **Los enums llevan `///`** cuando no es obvio por qué son un enum y no una
-  tabla, típicamente porque los fija una norma o el código (como `UserRole`).
+  tabla, típicamente porque los fija una norma o el código (como `RolUsuario`).
 - **`///` para el porqué, `//` para notas del schema.** `///` pasa al cliente
-  generado como JSDoc: quien escribe `prisma.session` lo ve al pasar el cursor,
+  generado como JSDoc: quien escribe `prisma.sesion` lo ve al pasar el cursor,
   sin abrir el schema. `//` se descarta al generar, y queda para separadores de
   sección y notas sobre relaciones (`onDelete`, cascadas).
 - **Un modelo sin `///` no pasa la revisión.**
@@ -229,24 +222,24 @@ no un apaño:
 
 ```prisma
 // Ejemplo
-model Vehicle {
-  vehicleId String @id @default(uuid()) @map("vehicle_id") @db.Uuid
-  plate     String @unique @db.VarChar(10)
+model Vehiculo {
+  vehiculoId String @id @default(uuid()) @map("vehiculo_id") @db.Uuid
+  placa      String @unique @db.VarChar(10)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt      @map("actualizado_en")
 
-  @@map("customer_vehicle")
+  @@map("vehiculo")
 }
 
-model WorkOrderNote {
-  workOrderNoteId String @id @default(uuid()) @map("work_order_note_id") @db.Uuid
-  text            String
+model EventoOrden {
+  eventoOrdenId String  @id @default(uuid()) @map("evento_orden_id") @db.Uuid
+  nota          String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  // Sin `updatedAt`: las notas no se editan. Omitir un campo común es
+  creadoEn DateTime @default(now()) @map("creado_en")
+  // Sin `actualizadoEn`: los eventos no se editan. Omitir un campo común es
   // simplemente no escribirlo.
-  @@map("workshop_work_order_note")
+  @@map("evento_orden")
 }
 ```
 
@@ -369,13 +362,13 @@ src/modules/workshop/work-orders/        (ejemplo)
 ```
 
 Y el modelo, que la CLI no genera, va aparte: en el archivo del **dominio** al
-que pertenece, dentro de `prisma/schema/` (`WorkOrder` iría en
-`workshop.prisma`, junto a `Vehicle` y `Customer` — no en un
+que pertenece, dentro de `prisma/schema/` (`OrdenTrabajo` iría en
+`workshop.prisma`, junto a `DetalleOrden` y `Presupuesto` — no en un
 `work-order.prisma` propio).
 
-Los identificadores van en inglés —modelo, campos, carpeta, clases— y los
-términos del negocio sin traducción evidente llevan su nombre en español en el
-`///`. Ver [`nomenclatura.md`](../../rules/nomenclatura.md).
+El dominio —modelo, campos, enums, columnas y el JSON de la API— va en
+español; la estructura —carpeta, archivos, clases, métodos, rutas— en inglés.
+Ver [`nomenclatura.md`](../../rules/nomenclatura.md).
 
 | Archivo | Qué va | Qué **no** va |
 |---|---|---|
@@ -418,10 +411,9 @@ export class CreateCustomerDto {
   `{ skipNullProperties: false }`**: con el default, `{ "name": null }` salta la
   validación y la base lo rechaza con un 500. Los opcionales siguen aceptando
   `null` por su propio `@IsOptional`. Un campo **opcional pero no anulable**
-  (un enum con default, como el `status` de una herramienta) usa
+  (por ejemplo, un enum con default) usa
   `@ValidateIf((_dto, value) => value !== undefined)` en vez de `@IsOptional`:
-  así un `null` se valida (400) en vez de llegar a la base. Ejemplo real:
-  `modules/inventory/tools/dto/create-tool.dto.ts`.
+  así un `null` se valida (400) en vez de llegar a la base.
 - **Un monto en soles se valida con `@ToMoneyText()` y `@IsMoney('El precio…')`**
   (`src/core/validation/money.ts`): acepta texto o número, lo deja como
   texto y exige no negativo, hasta 2 decimales y hasta 99999999.99 (lo que cabe
@@ -460,18 +452,20 @@ queda libre para lo que de verdad hacía falta: **decidir qué sale por la API**
 
 ```ts
 // Ejemplo
+// La clase y el archivo quedan en inglés (estructura); los campos, en español
+// (dominio y JSON de la API).
 export class WorkOrder {
-  constructor(order: WorkOrderModel) {
-    this.id = order.id;
-    this.mileageIn = order.mileageIn;
-    this.laborCost = order.laborCost.toFixed(2);
-    this.createdAt = order.createdAt;
+  constructor(order: OrdenTrabajo) {
+    this.ordenTrabajoId = order.ordenTrabajoId;
+    this.kilometrajeIngreso = order.kilometrajeIngreso;
+    this.costoManoObra = order.costoManoObra.toFixed(2);
+    this.creadoEn = order.creadoEn;
   }
 
-  @ApiProperty({ format: 'uuid' }) id: string;
-  @ApiProperty({ example: 84500 }) mileageIn: number;
-  @ApiProperty({ example: '180.00' }) laborCost: string;
-  @ApiProperty({ format: 'date-time' }) createdAt: Date;
+  @ApiProperty({ format: 'uuid' }) ordenTrabajoId: string;
+  @ApiProperty({ example: 84500 }) kilometrajeIngreso: number;
+  @ApiProperty({ example: '180.00' }) costoManoObra: string;
+  @ApiProperty({ format: 'date-time' }) creadoEn: Date;
 }
 ```
 
@@ -642,13 +636,13 @@ base.
 `app.module.ts`, en este orden, porque el segundo lee lo que deja el primero):
 
 - **`AccessGuard`**: verifica el JWT de la cookie `afm_access` y deja el usuario
-  (`SessionUser`: `id` y `role`) en la petición.
+  (`SessionUser`: `usuarioId` y `rol`) en la petición.
 - **`RolesGuard`**: si el endpoint declara `@Roles(...)`, el rol del usuario
   tiene que ser uno de esos. Sin el decorador, basta con tener sesión.
 
 ```ts
 // Ejemplo: solo un administrador gestiona los usuarios, en todo el controlador
-@Roles(UserRole.ADMIN)
+@Roles(RolUsuario.ADMINISTRADOR)
 @Controller('users')
 export class UsersController { … }
 
@@ -668,11 +662,11 @@ session(@CurrentUser() user: SessionUser) { … }
   modifica.
 - **Un endpoint público se marca con `@Public()`.** Un endpoint desprotegido
   tiene que ser una decisión visible, no un olvido.
-- **Los roles los define el código**: son el enum `UserRole` de `core.prisma`
-  (`ADMIN`, `MECHANIC`), no una tabla. Un usuario tiene un solo rol y no hay
+- **Los roles los define el código**: son el enum `RolUsuario` de `core.prisma`
+  (`ADMINISTRADOR`, `MECANICO`), no una tabla. Un usuario tiene un solo rol y no hay
   permisos finos: el taller no los necesita.
   - Un rol nuevo es un valor nuevo del enum, con su migración.
-  - `@Roles` recibe `UserRole`: un rol mal escrito no compila.
+  - `@Roles` recibe `RolUsuario`: un rol mal escrito no compila.
 - **El rol viaja en el JWT**, así que los guards no consultan la base.
   Consecuencia: un cambio de rol o una baja tardan hasta `ACCESS_TOKEN_MINUTES`
   en notarse. El refresco sí consulta la base y rechaza al usuario inactivo, y
@@ -700,8 +694,7 @@ El ejemplo real: `VehiclesModule` importa `CustomersModule`, que exporta
 `CustomersService`, y verifica al dueño con `customers.findOne()`. Leer la
 relación del propio modelo con `include` (el cliente resumido de cada vehículo)
 sí está permitido: es la consulta del módulo dueño de `Vehicle`. Igual
-`ToolsModule` con `UsersModule` (`users.findOne()` para asignar una
-herramienta solo a un usuario activo). Y `WorkOrdersModule` con
+`WorkOrdersModule` con
 `VehiclesModule`, `CustomersModule` y `UsersModule`: el vehículo que ingresa,
 su dueño (que tiene que estar activo) y el mecánico, cada uno por su service;
 y, para sus ítems, con `ServiceCatalogModule`, `ProductsModule` y

@@ -10,11 +10,11 @@ async function messagesOf(body: Record<string, unknown>) {
 
 describe('UpdateVehicleDto', () => {
   it('rechaza null en un campo obligatorio', async () => {
-    expect(await messagesOf({ brand: null })).toEqual(['Ingresa la marca']);
+    expect(await messagesOf({ marca: null })).toEqual(['Ingresa la marca']);
   });
 
   it('acepta null en un opcional: así se borra el dato', async () => {
-    expect(await messagesOf({ color: null, vin: null, year: null })).toEqual(
+    expect(await messagesOf({ color: null, vin: null, anio: null })).toEqual(
       [],
     );
   });

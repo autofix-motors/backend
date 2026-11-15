@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { WorkOrder as WorkOrderModel } from '../../../../generated/prisma/client.js';
-import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
+import type { OrdenTrabajo as WorkOrderModel } from '../../../../generated/prisma/client.js';
+import { EstadoOrden } from '../../../../generated/prisma/enums.js';
 import { fromDateColumn } from '../../../../shared/date-column.js';
 import { limaToday } from '../../../../shared/lima-dates.js';
 import { isOverdue } from '../work-order-status.js';
@@ -19,11 +19,11 @@ import {
 } from './work-order-vehicle.entity.js';
 
 export type WorkOrderWithRelations = WorkOrderModel & {
-  vehicle: WorkOrderVehicleModel;
-  customer: WorkOrderCustomerModel;
-  mechanic: WorkOrderUserModel | null;
+  vehiculo: WorkOrderVehicleModel;
+  cliente: WorkOrderCustomerModel;
+  mecanico: WorkOrderUserModel | null;
   /** Solo lo que hace falta para el total: tipo, cantidad y precio. */
-  items: TotaledItem[];
+  detalles: TotaledItem[];
 };
 
 /**
@@ -32,43 +32,43 @@ export type WorkOrderWithRelations = WorkOrderModel & {
  */
 export class WorkOrder {
   constructor(order: WorkOrderWithRelations, today: string = limaToday()) {
-    this.workOrderId = order.workOrderId;
-    this.number = order.number;
-    this.trackingCode = order.trackingCode;
-    this.status = order.status;
-    this.mileageIn = order.mileageIn;
-    this.reason = order.reason;
-    this.promisedDate =
-      order.promisedDate && fromDateColumn(order.promisedDate);
-    this.receivedAt = order.receivedAt;
-    this.deliveredAt = order.deliveredAt;
-    this.isOverdue = isOverdue(order.status, this.promisedDate, today);
-    this.vehicle = new WorkOrderVehicle(order.vehicle);
-    this.customer = new WorkOrderCustomer(order.customer);
-    this.mechanic = order.mechanic && new WorkOrderUser(order.mechanic);
-    this.total = workOrderAmounts(order.items).total.toFixed(2);
+    this.ordenTrabajoId = order.ordenTrabajoId;
+    this.numero = order.numero;
+    this.codigoSeguimiento = order.codigoSeguimiento;
+    this.estado = order.estado;
+    this.kilometrajeIngreso = order.kilometrajeIngreso;
+    this.motivo = order.motivo;
+    this.fechaPrometida =
+      order.fechaPrometida && fromDateColumn(order.fechaPrometida);
+    this.recibidaEn = order.recibidaEn;
+    this.entregadaEn = order.entregadaEn;
+    this.vencida = isOverdue(order.estado, this.fechaPrometida, today);
+    this.vehiculo = new WorkOrderVehicle(order.vehiculo);
+    this.cliente = new WorkOrderCustomer(order.cliente);
+    this.mecanico = order.mecanico && new WorkOrderUser(order.mecanico);
+    this.total = workOrderAmounts(order.detalles).total.toFixed(2);
   }
 
   @ApiProperty({ format: 'uuid' })
-  workOrderId: string;
+  ordenTrabajoId: string;
 
   @ApiProperty({
     example: 123,
     description: 'Correlativo; se muestra como OT-000123',
   })
-  number: number;
+  numero: number;
 
   @ApiProperty({ example: 'AFM-7K3Q9X' })
-  trackingCode: string;
+  codigoSeguimiento: string;
 
-  @ApiProperty({ enum: WorkOrderStatus, enumName: 'WorkOrderStatus' })
-  status: WorkOrderStatus;
+  @ApiProperty({ enum: EstadoOrden, enumName: 'EstadoOrden' })
+  estado: EstadoOrden;
 
   @ApiProperty({ example: 84500, description: 'Kilometraje al ingreso, en km' })
-  mileageIn: number;
+  kilometrajeIngreso: number;
 
   @ApiProperty({ example: 'Ruido al frenar y vibración en el timón' })
-  reason: string;
+  motivo: string;
 
   @ApiProperty({
     type: String,
@@ -76,28 +76,28 @@ export class WorkOrder {
     nullable: true,
     example: '2026-10-08',
   })
-  promisedDate: string | null;
+  fechaPrometida: string | null;
 
   @ApiProperty({ format: 'date-time' })
-  receivedAt: Date;
+  recibidaEn: Date;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  deliveredAt: Date | null;
+  entregadaEn: Date | null;
 
   @ApiProperty({
     description:
       'La fecha prometida ya pasó (en Lima) y no se entregó ni se canceló',
   })
-  isOverdue: boolean;
+  vencida: boolean;
 
   @ApiProperty({ type: WorkOrderVehicle })
-  vehicle: WorkOrderVehicle;
+  vehiculo: WorkOrderVehicle;
 
   @ApiProperty({ type: WorkOrderCustomer })
-  customer: WorkOrderCustomer;
+  cliente: WorkOrderCustomer;
 
   @ApiProperty({ type: WorkOrderUser, nullable: true })
-  mechanic: WorkOrderUser | null;
+  mecanico: WorkOrderUser | null;
 
   @ApiProperty({
     example: '275.50',

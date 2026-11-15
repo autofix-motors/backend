@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { User as UserModel } from '../../../../generated/prisma/client.js';
+import type { Usuario as UserModel } from '../../../../generated/prisma/client.js';
 
-export type WorkOrderUserModel = Pick<UserModel, 'userId' | 'name'>;
+export type WorkOrderUserModel = Pick<UserModel, 'usuarioId' | 'nombre'>;
 
 /**
  * Una persona del taller en una orden (el mecánico, quien la registró, quien
@@ -9,13 +9,13 @@ export type WorkOrderUserModel = Pick<UserModel, 'userId' | 'name'>;
  */
 export class WorkOrderUser {
   constructor(user: WorkOrderUserModel) {
-    this.userId = user.userId;
-    this.name = user.name;
+    this.usuarioId = user.usuarioId;
+    this.nombre = user.nombre;
   }
 
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  usuarioId: string;
 
   @ApiProperty({ example: 'Carlos Huamán Quispe' })
-  name: string;
+  nombre: string;
 }

@@ -9,7 +9,7 @@ import {
  *
  * - `whitelist`: solo pasan al service las propiedades decoradas en el DTO.
  * - `forbidNonWhitelisted`: una propiedad de más es un 400, así nadie escribe
- *   una columna que el DTO no declara (un `roleId` o un `isActive` colado en el
+ *   una columna que el DTO no declara (un `rol` o un `activo` colado en el
  *   cuerpo). La condición es que TODO endpoint que recibe cuerpo tenga su DTO
  *   decorado: sin decoradores, el cuerpo llegaría vacío.
  * - `exceptionFactory`: los mensajes de los DTO ya están en español, pero el de

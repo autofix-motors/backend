@@ -1,73 +1,76 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Customer as CustomerModel } from '../../../../generated/prisma/client.js';
-import { DocumentType } from '../../../../generated/prisma/enums.js';
-import { PortalAccess, type PortalAccessModel } from './portal-access.entity.js';
+import type { Cliente as CustomerModel } from '../../../../generated/prisma/client.js';
+import { TipoDocumento } from '../../../../generated/prisma/enums.js';
+import {
+  PortalAccess,
+  type PortalAccessModel,
+} from './portal-access.entity.js';
 
 export type CustomerWithCounts = CustomerModel & {
-  _count: { vehicles: number };
-  account?: PortalAccessModel | null;
+  _count: { vehiculos: number };
+  cuentaCliente?: PortalAccessModel | null;
 };
 
 /** Lo que sale de un cliente por la API, con cuántos vehículos tiene. */
 export class Customer {
   constructor(customer: CustomerWithCounts) {
-    this.customerId = customer.customerId;
-    this.documentType = customer.documentType;
-    this.documentNumber = customer.documentNumber;
-    this.name = customer.name;
-    this.phone = customer.phone;
-    this.email = customer.email;
-    this.address = customer.address;
-    this.notes = customer.notes;
-    this.isActive = customer.isActive;
-    this.vehiclesCount = customer._count.vehicles;
-    this.portalAccess = customer.account
-      ? new PortalAccess(customer.account)
+    this.clienteId = customer.clienteId;
+    this.tipoDocumento = customer.tipoDocumento;
+    this.numeroDocumento = customer.numeroDocumento;
+    this.nombre = customer.nombre;
+    this.telefono = customer.telefono;
+    this.correo = customer.correo;
+    this.direccion = customer.direccion;
+    this.notas = customer.notas;
+    this.activo = customer.activo;
+    this.cantidadVehiculos = customer._count.vehiculos;
+    this.accesoPortal = customer.cuentaCliente
+      ? new PortalAccess(customer.cuentaCliente)
       : null;
-    this.createdAt = customer.createdAt;
-    this.updatedAt = customer.updatedAt;
+    this.creadoEn = customer.creadoEn;
+    this.actualizadoEn = customer.actualizadoEn;
   }
 
   @ApiProperty({ format: 'uuid' })
-  customerId: string;
+  clienteId: string;
 
-  @ApiProperty({ enum: DocumentType, enumName: 'DocumentType' })
-  documentType: DocumentType;
+  @ApiProperty({ enum: TipoDocumento, enumName: 'TipoDocumento' })
+  tipoDocumento: TipoDocumento;
 
   @ApiProperty({ example: '45678912' })
-  documentNumber: string;
+  numeroDocumento: string;
 
   @ApiProperty({ example: 'Juan Pérez Rojas' })
-  name: string;
+  nombre: string;
 
   @ApiProperty({ example: '987654321' })
-  phone: string;
+  telefono: string;
 
   @ApiProperty({ type: String, nullable: true, example: 'juan@correo.pe' })
-  email: string | null;
+  correo: string | null;
 
   @ApiProperty({ type: String, nullable: true })
-  address: string | null;
+  direccion: string | null;
 
   @ApiProperty({ type: String, nullable: true })
-  notes: string | null;
+  notas: string | null;
 
   @ApiProperty()
-  isActive: boolean;
+  activo: boolean;
 
   @ApiProperty({ example: 2 })
-  vehiclesCount: number;
+  cantidadVehiculos: number;
 
   @ApiProperty({
     type: PortalAccess,
     nullable: true,
     description: 'Vacío si no tiene acceso al portal',
   })
-  portalAccess: PortalAccess | null;
+  accesoPortal: PortalAccess | null;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 
   @ApiProperty({ format: 'date-time' })
-  updatedAt: Date;
+  actualizadoEn: Date;
 }

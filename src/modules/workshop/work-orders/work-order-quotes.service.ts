@@ -8,8 +8,8 @@ import type { SessionUser } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
 import {
-  DecisionChannel,
-  QuoteStatus,
+  CanalDecision,
+  EstadoPresupuesto,
 } from '../../../generated/prisma/enums.js';
 import type { CreateQuoteDto } from './dto/create-quote.dto.js';
 import type { DecideQuoteDto, QuoteDecision } from './dto/decide-quote.dto.js';
@@ -34,30 +34,30 @@ const STALE_QUOTE =
 
 /** Por qué ya no se puede registrar la respuesta de una versión. */
 const ALREADY_DECIDED: Record<
-  Exclude<QuoteStatus, 'PENDING'>,
+  Exclude<EstadoPresupuesto, 'PENDIENTE'>,
   (version: number) => string
 > = {
-  APPROVED: (version) =>
+  APROBADO: (version) =>
     `El presupuesto v${version} ya se registró como aprobado`,
-  REJECTED: (version) =>
+  RECHAZADO: (version) =>
     `El presupuesto v${version} ya se registró como rechazado`,
-  SUPERSEDED: (version) =>
+  REEMPLAZADO: (version) =>
     `El presupuesto v${version} fue reemplazado por una versión más nueva`,
 };
 
 const DECISION_TRANSITION: Record<QuoteDecision, SystemTransition> = {
-  APPROVED: 'QUOTE_APPROVED',
-  REJECTED: 'QUOTE_REJECTED',
+  APROBADO: 'PRESUPUESTO_APROBADO',
+  RECHAZADO: 'PRESUPUESTO_RECHAZADO',
 };
 
 const DECISION_TEXT: Record<QuoteDecision, string> = {
-  APPROVED: 'aprobado',
-  REJECTED: 'rechazado',
+  APROBADO: 'aprobado',
+  RECHAZADO: 'rechazado',
 };
 
 /**
  * Los presupuestos de una orden. Viven en el módulo de órdenes, como sus
- * ítems, porque son parte de la orden: el detalle los lee con su `include`,
+ * detalles, porque son parte de la orden: el detalle los lee con su `include`,
  * cada cambio responde la orden completa, y para saber quién ve la orden se
  * necesita su service. Como módulo aparte, `work-orders` lo necesitaría para
  * el detalle y él a `work-orders` para la orden: una dependencia circular.
@@ -78,95 +78,95 @@ export class WorkOrderQuotesService {
   ) {}
 
   /**
-   * Envía una versión nueva: la foto de los ítems de la orden y su total. La
-   * versión PENDING anterior, si la hay, queda SUPERSEDED, y la orden pasa a
+   * Envía una versión nueva: la foto de los detalles de la orden y su total. La
+   * versión PENDIENTE anterior, si la hay, queda REEMPLAZADO, y la orden pasa a
    * «Esperando aprobación» con un evento público. Todo en una transacción.
    */
   async send(
-    workOrderId: string,
+    ordenTrabajoId: string,
     dto: CreateQuoteDto,
     actor: SessionUser,
   ): Promise<WorkOrderWithTimeline> {
-    const order = await this.workOrders.findOne(workOrderId, actor);
-    const from = order.status;
-    if (!canApplySystemTransition('QUOTE_SENT', from)) {
+    const order = await this.workOrders.findOne(ordenTrabajoId, actor);
+    const from = order.estado;
+    if (!canApplySystemTransition('PRESUPUESTO_ENVIADO', from)) {
       throw new ConflictException(
         `No se puede enviar un presupuesto con la orden en «${WORK_ORDER_STATUS_LABELS[from]}»: se envía en diagnóstico, en reparación o esperando repuestos`,
       );
     }
-    if (order.items.length === 0) throw new BadRequestException(NO_ITEMS);
+    if (order.detalles.length === 0) throw new BadRequestException(NO_ITEMS);
 
-    const { to } = SYSTEM_TRANSITIONS.QUOTE_SENT;
-    const sentAt = new Date();
+    const { to } = SYSTEM_TRANSITIONS.PRESUPUESTO_ENVIADO;
+    const enviadoEn = new Date();
     return this.prisma.$transaction(async (tx) => {
       // Primero el estado, con el leído en el `where`: además de detectar un
       // cambio simultáneo, deja la fila de la orden tomada hasta el final, así
-      // que un ítem que se agrega a la vez espera y después falla (la orden
-      // ya no está en un estado que acepte ítems). Los ítems que se leen
+      // que un detalle que se agrega a la vez espera y después falla (la orden
+      // ya no está en un estado que acepte detalles). Los detalles que se leen
       // abajo son entonces los definitivos.
       await unlessStale(
-        tx.workOrder.update({
-          where: { workOrderId, status: from },
-          data: { status: to },
-          select: { workOrderId: true },
+        tx.ordenTrabajo.update({
+          where: { ordenTrabajoId, estado: from },
+          data: { estado: to },
+          select: { ordenTrabajoId: true },
         }),
       );
 
-      const items = await tx.workOrderItem.findMany({
-        where: { workOrderId },
-        orderBy: [{ createdAt: 'asc' }, { workOrderItemId: 'asc' }],
+      const detalles = await tx.detalleOrden.findMany({
+        where: { ordenTrabajoId },
+        orderBy: [{ creadoEn: 'asc' }, { detalleOrdenId: 'asc' }],
       });
-      // Alguien quitó el último ítem entre la lectura y la transacción.
-      if (items.length === 0) throw new BadRequestException(NO_ITEMS);
+      // Alguien quitó el último detalle entre la lectura y la transacción.
+      if (detalles.length === 0) throw new BadRequestException(NO_ITEMS);
 
-      const last = await tx.quote.findFirst({
-        where: { workOrderId },
+      const last = await tx.presupuesto.findFirst({
+        where: { ordenTrabajoId },
         orderBy: { version: 'desc' },
         select: { version: true },
       });
       const version = (last?.version ?? 0) + 1;
       // Hoy una versión pendiente no convive con el envío de otra (la orden
       // sale de «Esperando aprobación» solo al decidir o cancelar), pero si
-      // la hubiera, la nueva la reemplaza: nunca hay dos PENDING.
-      await tx.quote.updateMany({
-        where: { workOrderId, status: QuoteStatus.PENDING },
-        data: { status: QuoteStatus.SUPERSEDED },
+      // la hubiera, la nueva la reemplaza: nunca hay dos PENDIENTE.
+      await tx.presupuesto.updateMany({
+        where: { ordenTrabajoId, estado: EstadoPresupuesto.PENDIENTE },
+        data: { estado: EstadoPresupuesto.REEMPLAZADO },
       });
-      const { total } = workOrderAmounts(items);
-      await tx.quote.create({
+      const { total } = workOrderAmounts(detalles);
+      await tx.presupuesto.create({
         data: {
-          workOrderId,
+          ordenTrabajoId,
           version,
           total,
-          sentById: actor.userId,
-          sentAt,
-          items: {
-            // La foto: sin costo (el cliente no lo ve) y sin apuntar al ítem
-            // vivo. `QuoteItem` no tiene columna de posición, así que el orden
-            // de la orden se conserva con un `createdAt` que avanza un
+          enviadoPorId: actor.usuarioId,
+          enviadoEn,
+          detalles: {
+            // La foto: sin costo (el cliente no lo ve) y sin apuntar al detalle
+            // vivo. `DetallePresupuesto` no tiene columna de posición, así que el orden
+            // de la orden se conserva con un `creadoEn` que avanza un
             // milisegundo por línea.
-            create: items.map((item, index) => ({
-              type: item.type,
-              description: item.description,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              createdAt: new Date(sentAt.getTime() + index),
+            create: detalles.map((item, index) => ({
+              tipo: item.tipo,
+              descripcion: item.descripcion,
+              cantidad: item.cantidad,
+              precioUnitario: item.precioUnitario,
+              creadoEn: new Date(enviadoEn.getTime() + index),
             })),
           },
         },
       });
 
       const sent = `Presupuesto v${version} enviado: ${moneyText(total)}`;
-      return tx.workOrder.update({
-        where: { workOrderId },
+      return tx.ordenTrabajo.update({
+        where: { ordenTrabajoId },
         data: {
-          events: {
+          eventos: {
             create: {
-              status: to,
-              note: dto.note ? `${sent}\n${dto.note}` : sent,
-              isPublic: true,
-              createdById: actor.userId,
-              createdAt: sentAt,
+              estado: to,
+              nota: dto.nota ? `${sent}\n${dto.nota}` : sent,
+              esPublico: true,
+              creadoPorId: actor.usuarioId,
+              creadoEn: enviadoEn,
             },
           },
         },
@@ -176,24 +176,24 @@ export class WorkOrderQuotesService {
   }
 
   /**
-   * Registra la respuesta del cliente sobre la versión PENDING, como la
+   * Registra la respuesta del cliente sobre la versión PENDIENTE, como la
    * cuenta el administrador (por llamada, WhatsApp o en el taller): aprobado
    * lleva la orden a reparación; rechazado, de vuelta a diagnóstico.
    */
   async decide(
-    workOrderId: string,
-    quoteId: string,
+    ordenTrabajoId: string,
+    presupuestoId: string,
     dto: DecideQuoteDto,
     actor: SessionUser,
   ): Promise<WorkOrderWithTimeline> {
-    const order = await this.workOrders.findOne(workOrderId, actor);
-    const quote = assertDecidable(order, quoteId, dto.decision);
-    return this.applyDecision(order, quote, {
+    const order = await this.workOrders.findOne(ordenTrabajoId, actor);
+    const presupuesto = assertDecidable(order, presupuestoId, dto.decision);
+    return this.applyDecision(order, presupuesto, {
       decision: dto.decision,
-      channel: dto.channel,
-      note: dto.note ?? null,
-      decidedById: actor.userId,
-      eventNote: `Presupuesto v${quote.version} ${DECISION_TEXT[dto.decision]}`,
+      canal: dto.canal,
+      nota: dto.nota ?? null,
+      decididoPorId: actor.usuarioId,
+      notaEvento: `Presupuesto v${presupuesto.version} ${DECISION_TEXT[dto.decision]}`,
     });
   }
 
@@ -203,22 +203,22 @@ export class WorkOrderQuotesService {
    * usuario, así que el canal (PORTAL) dice quién respondió.
    */
   async decideByCustomer(
-    workOrderId: string,
-    quoteId: string,
-    input: { decision: QuoteDecision; note?: string | null },
-    customerId: string,
+    ordenTrabajoId: string,
+    presupuestoId: string,
+    input: { decision: QuoteDecision; nota?: string | null },
+    clienteId: string,
   ): Promise<WorkOrderWithTimeline> {
     const order = await this.workOrders.findOneForCustomer(
-      workOrderId,
-      customerId,
+      ordenTrabajoId,
+      clienteId,
     );
-    const quote = assertDecidable(order, quoteId, input.decision);
-    return this.applyDecision(order, quote, {
+    const presupuesto = assertDecidable(order, presupuestoId, input.decision);
+    return this.applyDecision(order, presupuesto, {
       decision: input.decision,
-      channel: DecisionChannel.PORTAL,
-      note: input.note ?? null,
-      decidedById: null,
-      eventNote: `Presupuesto v${quote.version} ${DECISION_TEXT[input.decision]} por el cliente desde el portal`,
+      canal: CanalDecision.PORTAL,
+      nota: input.nota ?? null,
+      decididoPorId: null,
+      notaEvento: `Presupuesto v${presupuesto.version} ${DECISION_TEXT[input.decision]} por el cliente desde el portal`,
     });
   }
 
@@ -229,45 +229,48 @@ export class WorkOrderQuotesService {
    */
   private applyDecision(
     order: WorkOrderWithTimeline,
-    quote: QuoteWithRelations,
+    presupuesto: QuoteWithRelations,
     decision: {
       decision: QuoteDecision;
-      channel: DecisionChannel;
-      note: string | null;
+      canal: CanalDecision;
+      nota: string | null;
       /** Vacío cuando respondió el cliente desde su portal. */
-      decidedById: string | null;
-      eventNote: string;
+      decididoPorId: string | null;
+      notaEvento: string;
     },
   ): Promise<WorkOrderWithTimeline> {
     const { to } = SYSTEM_TRANSITIONS[DECISION_TRANSITION[decision.decision]];
-    const decidedAt = new Date();
+    const decididoEn = new Date();
     return this.prisma.$transaction(async (tx) => {
-      // Con PENDING en el `where`: si otro registró la respuesta entre medio,
+      // Con PENDIENTE en el `where`: si otro registró la respuesta entre medio,
       // no se pisa.
-      const { count } = await tx.quote.updateMany({
-        where: { quoteId: quote.quoteId, status: QuoteStatus.PENDING },
+      const { count } = await tx.presupuesto.updateMany({
+        where: {
+          presupuestoId: presupuesto.presupuestoId,
+          estado: EstadoPresupuesto.PENDIENTE,
+        },
         data: {
-          status: decision.decision,
-          decidedById: decision.decidedById,
-          decidedAt,
-          decisionChannel: decision.channel,
-          decisionNote: decision.note,
+          estado: decision.decision,
+          decididoPorId: decision.decididoPorId,
+          decididoEn,
+          canalDecision: decision.canal,
+          notaDecision: decision.nota,
         },
       });
       if (count === 0) throw new ConflictException(STALE_QUOTE);
 
       return unlessStale(
-        tx.workOrder.update({
-          where: { workOrderId: order.workOrderId, status: order.status },
+        tx.ordenTrabajo.update({
+          where: { ordenTrabajoId: order.ordenTrabajoId, estado: order.estado },
           data: {
-            status: to,
-            events: {
+            estado: to,
+            eventos: {
               create: {
-                status: to,
-                note: decision.eventNote,
-                isPublic: true,
-                createdById: decision.decidedById,
-                createdAt: decidedAt,
+                estado: to,
+                nota: decision.notaEvento,
+                esPublico: true,
+                creadoPorId: decision.decididoPorId,
+                creadoEn: decididoEn,
               },
             },
           },
@@ -280,25 +283,27 @@ export class WorkOrderQuotesService {
 
 /**
  * La versión a responder, si se puede: tiene que ser de esta orden (si no,
- * 404), estar PENDING y la orden seguir esperando aprobación (si no, 409).
+ * 404), estar PENDIENTE y la orden seguir esperando aprobación (si no, 409).
  */
 function assertDecidable(
   order: WorkOrderWithTimeline,
-  quoteId: string,
+  presupuestoId: string,
   decision: QuoteDecision,
 ): QuoteWithRelations {
-  const quote = findQuote(order, quoteId);
-  if (quote.status !== QuoteStatus.PENDING) {
-    throw new ConflictException(ALREADY_DECIDED[quote.status](quote.version));
+  const presupuesto = findQuote(order, presupuestoId);
+  if (presupuesto.estado !== EstadoPresupuesto.PENDIENTE) {
+    throw new ConflictException(
+      ALREADY_DECIDED[presupuesto.estado](presupuesto.version),
+    );
   }
   // Una versión pendiente en una orden que ya no espera (la cancelaron
   // mientras esperaba): no hay respuesta que registrar.
-  if (!canApplySystemTransition(DECISION_TRANSITION[decision], order.status)) {
+  if (!canApplySystemTransition(DECISION_TRANSITION[decision], order.estado)) {
     throw new ConflictException(
-      `La orden está en «${WORK_ORDER_STATUS_LABELS[order.status]}»: la respuesta del cliente se registra mientras espera aprobación`,
+      `La orden está en «${WORK_ORDER_STATUS_LABELS[order.estado]}»: la respuesta del cliente se registra mientras espera aprobación`,
     );
   }
-  return quote;
+  return presupuesto;
 }
 
 /**
@@ -323,9 +328,11 @@ async function unlessStale<T>(write: Promise<T>): Promise<T> {
 /** El presupuesto de esta orden; uno de otra orden, para ella, no existe. */
 function findQuote(
   order: WorkOrderWithTimeline,
-  quoteId: string,
+  presupuestoId: string,
 ): QuoteWithRelations {
-  const quote = order.quotes.find((candidate) => candidate.quoteId === quoteId);
-  if (!quote) throw new NotFoundException(QUOTE_NOT_FOUND);
-  return quote;
+  const presupuesto = order.presupuestos.find(
+    (candidate) => candidate.presupuestoId === presupuestoId,
+  );
+  if (!presupuesto) throw new NotFoundException(QUOTE_NOT_FOUND);
+  return presupuesto;
 }

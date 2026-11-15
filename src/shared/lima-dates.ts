@@ -44,3 +44,58 @@ const LIMA_DAY = new Intl.DateTimeFormat('en-CA', {
   month: '2-digit',
   day: '2-digit',
 });
+
+/**
+ * El día `days` días después (o antes, con negativo) de `day`, `AAAA-MM-DD`.
+ * Se calcula sobre la medianoche UTC del día, que es solo aritmética de
+ * calendario: no hay hora de por medio.
+ */
+export function addDays(day: string, days: number): string {
+  const start = new Date(`${day}T00:00:00.000Z`).getTime();
+  return new Date(start + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+// Los meses, igual que los días, son los de Lima: lo entregado el 1 de
+// noviembre a las 00:30 de Lima (31 de octubre a las 05:30 UTC) es de
+// noviembre. Se escriben `AAAA-MM`, que se ordena bien como texto.
+
+/** El mes de Lima en que cae un instante, `AAAA-MM`. */
+export function limaMonth(date: Date): string {
+  return limaToday(date).slice(0, 7);
+}
+
+/** El mes `months` meses después (o antes, con negativo) de `month`. */
+export function addMonths(month: string, months: number): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const index = year * 12 + (monthNumber - 1) + months;
+  const nextYear = Math.floor(index / 12);
+  const nextMonth = (index % 12) + 1;
+  return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+}
+
+/** El instante en que empieza un mes `AAAA-MM` en Lima. */
+export function limaMonthStart(month: string): Date {
+  return limaDayStart(`${month}-01`);
+}
+
+/** El filtro de Prisma para un mes de Lima entero. */
+export function limaMonthRange(month: string): { gte: Date; lt: Date } {
+  return {
+    gte: limaMonthStart(month),
+    lt: limaMonthStart(addMonths(month, 1)),
+  };
+}
+
+/**
+ * Los últimos `count` meses de Lima, del más antiguo al actual (incluido), en
+ * el orden en que se dibujan en un gráfico.
+ */
+export function lastLimaMonths(
+  count: number,
+  now: Date = new Date(),
+): string[] {
+  const current = limaMonth(now);
+  return Array.from({ length: count }, (_, i) =>
+    addMonths(current, i - (count - 1)),
+  );
+}

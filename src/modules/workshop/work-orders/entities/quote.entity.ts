@@ -1,11 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type {
-  Quote as QuoteModel,
-  QuoteItem as QuoteItemModel,
+  Presupuesto as QuoteModel,
+  DetallePresupuesto as QuoteItemModel,
 } from '../../../../generated/prisma/client.js';
 import {
-  DecisionChannel,
-  QuoteStatus,
+  CanalDecision,
+  EstadoPresupuesto,
 } from '../../../../generated/prisma/enums.js';
 import { QuoteItem } from './quote-item.entity.js';
 import {
@@ -13,11 +13,11 @@ import {
   type WorkOrderUserModel,
 } from './work-order-user.entity.js';
 
-/** El presupuesto como lo lee la orden: con quién lo envió, quién decidió y sus ítems. */
+/** El presupuesto como lo lee la orden: con quién lo envió, quién decidió y sus detalles. */
 export type QuoteWithRelations = QuoteModel & {
-  sentBy: WorkOrderUserModel;
-  decidedBy: WorkOrderUserModel | null;
-  items: QuoteItemModel[];
+  enviadoPor: WorkOrderUserModel;
+  decididoPor: WorkOrderUserModel | null;
+  detalles: QuoteItemModel[];
 };
 
 /**
@@ -25,28 +25,29 @@ export type QuoteWithRelations = QuoteModel & {
  * congelado al enviarlo, y su respuesta si ya la hubo.
  */
 export class Quote {
-  constructor(quote: QuoteWithRelations) {
-    this.quoteId = quote.quoteId;
-    this.version = quote.version;
-    this.status = quote.status;
-    this.total = quote.total.toFixed(2);
-    this.sentAt = quote.sentAt;
-    this.sentBy = new WorkOrderUser(quote.sentBy);
-    this.decidedAt = quote.decidedAt;
-    this.decidedBy = quote.decidedBy && new WorkOrderUser(quote.decidedBy);
-    this.decisionChannel = quote.decisionChannel;
-    this.decisionNote = quote.decisionNote;
-    this.items = quote.items.map((item) => new QuoteItem(item));
+  constructor(presupuesto: QuoteWithRelations) {
+    this.presupuestoId = presupuesto.presupuestoId;
+    this.version = presupuesto.version;
+    this.estado = presupuesto.estado;
+    this.total = presupuesto.total.toFixed(2);
+    this.enviadoEn = presupuesto.enviadoEn;
+    this.enviadoPor = new WorkOrderUser(presupuesto.enviadoPor);
+    this.decididoEn = presupuesto.decididoEn;
+    this.decididoPor =
+      presupuesto.decididoPor && new WorkOrderUser(presupuesto.decididoPor);
+    this.canalDecision = presupuesto.canalDecision;
+    this.notaDecision = presupuesto.notaDecision;
+    this.detalles = presupuesto.detalles.map((item) => new QuoteItem(item));
   }
 
   @ApiProperty({ format: 'uuid' })
-  quoteId: string;
+  presupuestoId: string;
 
   @ApiProperty({ example: 2, description: '1, 2, 3… dentro de cada orden' })
   version: number;
 
-  @ApiProperty({ enum: QuoteStatus, enumName: 'QuoteStatus' })
-  status: QuoteStatus;
+  @ApiProperty({ enum: EstadoPresupuesto, enumName: 'EstadoPresupuesto' })
+  estado: EstadoPresupuesto;
 
   @ApiProperty({
     example: '450.00',
@@ -55,34 +56,34 @@ export class Quote {
   total: string;
 
   @ApiProperty({ format: 'date-time' })
-  sentAt: Date;
+  enviadoEn: Date;
 
   @ApiProperty({ type: WorkOrderUser, description: 'Quién lo envió' })
-  sentBy: WorkOrderUser;
+  enviadoPor: WorkOrderUser;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  decidedAt: Date | null;
+  decididoEn: Date | null;
 
   @ApiProperty({
     type: WorkOrderUser,
     nullable: true,
     description: 'El administrador que registró la respuesta del cliente',
   })
-  decidedBy: WorkOrderUser | null;
+  decididoPor: WorkOrderUser | null;
 
   @ApiProperty({
-    enum: DecisionChannel,
-    enumName: 'DecisionChannel',
+    enum: CanalDecision,
+    enumName: 'CanalDecision',
     nullable: true,
   })
-  decisionChannel: DecisionChannel | null;
+  canalDecision: CanalDecision | null;
 
   @ApiProperty({ type: String, nullable: true })
-  decisionNote: string | null;
+  notaDecision: string | null;
 
   @ApiProperty({
     type: [QuoteItem],
-    description: 'Los ítems como estaban al enviarlo',
+    description: 'Los detalles como estaban al enviarlo',
   })
-  items: QuoteItem[];
+  detalles: QuoteItem[];
 }

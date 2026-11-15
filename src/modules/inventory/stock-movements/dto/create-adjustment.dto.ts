@@ -16,7 +16,7 @@ import { MOVEMENT_NOTE_MAX_LENGTH } from './create-purchase.dto.js';
 export class CreateAdjustmentDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID('4', { message: 'Selecciona el producto' })
-  productId: string;
+  productoId: string;
 
   @ApiProperty({
     oneOf: [
@@ -29,7 +29,7 @@ export class CreateAdjustmentDto {
   @ToQuantityText()
   @IsMovementQuantity('La cantidad', { signed: true })
   @IsNotEmpty({ message: 'Ingresa la cantidad' })
-  quantity: string;
+  cantidad: string;
 
   @ApiProperty({
     maxLength: MOVEMENT_NOTE_MAX_LENGTH,
@@ -44,5 +44,5 @@ export class CreateAdjustmentDto {
   })
   @IsNotEmpty({ message: 'Ingresa el motivo del ajuste' })
   @IsString({ message: 'Ingresa el motivo del ajuste' })
-  note: string;
+  nota: string;
 }

@@ -9,8 +9,8 @@ import { CustomerAccountsService } from './customer-accounts.service.js';
 
 describe('CustomerAccountsService', () => {
   const prisma = {
-    customerAccount: {
-      upsert: vi.fn().mockResolvedValue({ customerAccountId: 'ca1' }),
+    cuentaCliente: {
+      upsert: vi.fn().mockResolvedValue({ cuentaClienteId: 'ca1' }),
       delete: vi.fn(),
       findMany: vi.fn(),
     },
@@ -30,41 +30,44 @@ describe('CustomerAccountsService', () => {
   describe('issueTemporaryPassword', () => {
     it('habilita o restablece con una temporal y cierra las sesiones anteriores', async () => {
       customers.findOne.mockResolvedValue({
-        customerId: 'c1',
-        documentNumber: '45678912',
-        isActive: true,
+        clienteId: 'c1',
+        numeroDocumento: '45678912',
+        activo: true,
       });
 
       const credentials = await service.issueTemporaryPassword('c1');
 
-      expect(credentials.loginIdentifier).toBe('45678912');
-      expect(credentials.temporaryPassword).toHaveLength(12);
-      const { create, update } = prisma.customerAccount.upsert.mock
+      expect(credentials.identificadorAcceso).toBe('45678912');
+      expect(credentials.contrasenaTemporal).toHaveLength(12);
+      const { create, update } = prisma.cuentaCliente.upsert.mock
         .calls[0][0] as {
-        create: { passwordHash: string; mustChangePassword: boolean };
-        update: { passwordHash: string };
+        create: { hashContrasena: string; debeCambiarContrasena: boolean };
+        update: { hashContrasena: string };
       };
-      expect(create.mustChangePassword).toBe(true);
-      expect(update.passwordHash).toBe(create.passwordHash);
+      expect(create.debeCambiarContrasena).toBe(true);
+      expect(update.hashContrasena).toBe(create.hashContrasena);
       expect(
-        await argon2.verify(create.passwordHash, credentials.temporaryPassword),
+        await argon2.verify(
+          create.hashContrasena,
+          credentials.contrasenaTemporal,
+        ),
       ).toBe(true);
       expect(sessions.revokeAll).toHaveBeenCalledWith({
-        customerAccountId: 'ca1',
+        cuentaClienteId: 'ca1',
       });
     });
 
     it('a un cliente inactivo no le da acceso', async () => {
-      customers.findOne.mockResolvedValue({ customerId: 'c1', isActive: false });
+      customers.findOne.mockResolvedValue({ clienteId: 'c1', activo: false });
       await expect(service.issueTemporaryPassword('c1')).rejects.toThrow(
         BadRequestException,
       );
-      expect(prisma.customerAccount.upsert).not.toHaveBeenCalled();
+      expect(prisma.cuentaCliente.upsert).not.toHaveBeenCalled();
     });
   });
 
   it('quitar el acceso de quien no lo tiene responde 404', async () => {
-    prisma.customerAccount.delete.mockRejectedValue(
+    prisma.cuentaCliente.delete.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('no existe', {
         code: 'P2025',
         clientVersion: 'test',
@@ -77,26 +80,26 @@ describe('CustomerAccountsService', () => {
 
   it('une las cuentas candidatas del login con su cliente', async () => {
     customers.findLoginCandidates.mockResolvedValue([
-      { customerId: 'c1', name: 'Juan', isActive: true },
-      { customerId: 'c2', name: 'Ana', isActive: false },
+      { clienteId: 'c1', nombre: 'Juan', activo: true },
+      { clienteId: 'c2', nombre: 'Ana', activo: false },
     ]);
-    prisma.customerAccount.findMany.mockResolvedValue([
-      { customerAccountId: 'ca2', customerId: 'c2' },
+    prisma.cuentaCliente.findMany.mockResolvedValue([
+      { cuentaClienteId: 'ca2', clienteId: 'c2' },
     ]);
 
     const candidates = await service.findLoginCandidates({
-      kind: 'email',
-      value: 'familia@correo.pe',
+      tipo: 'correo',
+      valor: 'familia@correo.pe',
     });
 
-    expect(prisma.customerAccount.findMany).toHaveBeenCalledWith({
-      where: { customerId: { in: ['c1', 'c2'] } },
+    expect(prisma.cuentaCliente.findMany).toHaveBeenCalledWith({
+      where: { clienteId: { in: ['c1', 'c2'] } },
     });
     expect(candidates).toEqual([
       {
-        customerAccountId: 'ca2',
-        customerId: 'c2',
-        customer: { customerId: 'c2', name: 'Ana', isActive: false },
+        cuentaClienteId: 'ca2',
+        clienteId: 'c2',
+        cliente: { clienteId: 'c2', nombre: 'Ana', activo: false },
       },
     ]);
   });
@@ -104,8 +107,8 @@ describe('CustomerAccountsService', () => {
   it('sin clientes que coincidan no consulta las cuentas', async () => {
     customers.findLoginCandidates.mockResolvedValue([]);
     expect(
-      await service.findLoginCandidates({ kind: 'document', value: '1' }),
+      await service.findLoginCandidates({ tipo: 'documento', valor: '1' }),
     ).toEqual([]);
-    expect(prisma.customerAccount.findMany).not.toHaveBeenCalled();
+    expect(prisma.cuentaCliente.findMany).not.toHaveBeenCalled();
   });
 });

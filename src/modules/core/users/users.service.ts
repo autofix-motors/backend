@@ -13,7 +13,7 @@ import {
 import type { SessionUser } from '../../../core/auth/session-user.js';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import {
   pageWindow,
   paginationMeta,
@@ -26,29 +26,29 @@ import type { UpdateUserDto } from './dto/update-user.dto.js';
 import type { UserWithCounts } from './entities/user.entity.js';
 
 const WITH_COUNTS = {
-  _count: { select: { assignedWorkOrders: true } },
-} satisfies Prisma.UserInclude;
+  _count: { select: { ordenesAsignadas: true } },
+} satisfies Prisma.UsuarioInclude;
 
 /**
  * Todo lo que el usuario dejó registrado en los demás dominios, con cómo se
- * nombra en el mensaje del 409. Son las relaciones de `User` con RESTRICT: si
+ * nombra en el mensaje del 409. Son las relaciones de `Usuario` con RESTRICT: si
  * alguna tiene filas, la base no deja borrarlo.
  */
 const HISTORY_LABELS = {
-  assignedWorkOrders: ['orden asignada', 'órdenes asignadas'],
-  createdWorkOrders: ['orden registrada', 'órdenes registradas'],
-  workOrderEvents: [
+  ordenesAsignadas: ['orden asignada', 'órdenes asignadas'],
+  ordenesCreadas: ['orden registrada', 'órdenes registradas'],
+  eventosOrden: [
     'nota o cambio de estado en una orden',
     'notas o cambios de estado en órdenes',
   ],
-  sentQuotes: ['presupuesto enviado', 'presupuestos enviados'],
-  decidedQuotes: ['decisión de presupuesto', 'decisiones de presupuesto'],
-  stockMovements: ['movimiento de stock', 'movimientos de stock'],
-  assignedTools: ['herramienta a su cargo', 'herramientas a su cargo'],
-  receivedPayments: ['pago recibido', 'pagos recibidos'],
-  voidedPayments: ['pago anulado', 'pagos anulados'],
+  presupuestosEnviados: ['presupuesto enviado', 'presupuestos enviados'],
+  presupuestosDecididos: [
+    'decisión de presupuesto',
+    'decisiones de presupuesto',
+  ],
+  movimientosStock: ['movimiento de stock', 'movimientos de stock'],
 } as const satisfies Partial<
-  Record<keyof Prisma.UserCountOutputType, readonly [string, string]>
+  Record<keyof Prisma.UsuarioCountOutputType, readonly [string, string]>
 >;
 
 type HistoryCounts = Record<keyof typeof HISTORY_LABELS, number>;
@@ -63,8 +63,8 @@ const DUPLICATE_DOCUMENT = 'Ya existe un usuario con ese DNI';
 
 /** La contraseña temporal recién generada: se muestra una sola vez. */
 export interface TemporaryPasswordResult {
-  temporaryPassword: string;
-  expiresAt: Date;
+  contrasenaTemporal: string;
+  expiraEn: Date;
 }
 const LAST_ADMIN =
   'Es el último administrador activo: el taller necesita al menos uno. Asigna antes el rol a otro usuario';
@@ -80,22 +80,22 @@ export class UsersService {
   async findAll(query: ListUsersQueryDto): Promise<Page<UserWithCounts>> {
     const where = usersWhere(query);
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
+      this.prisma.usuario.findMany({
         where,
         include: WITH_COUNTS,
         // El desempate por id hace que la paginación sea estable: con dos
         // usuarios del mismo nombre, el orden no cambia entre páginas.
-        orderBy: [usersOrderBy(query), { userId: 'asc' }],
+        orderBy: [usersOrderBy(query), { usuarioId: 'asc' }],
         ...pageWindow(query.page, query.pageSize),
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.usuario.count({ where }),
     ]);
     return { items, meta: paginationMeta(query.page, query.pageSize, total) };
   }
 
-  async findOne(userId: string): Promise<UserWithCounts> {
-    const user = await this.prisma.user.findUnique({
-      where: { userId },
+  async findOne(usuarioId: string): Promise<UserWithCounts> {
+    const user = await this.prisma.usuario.findUnique({
+      where: { usuarioId },
       include: WITH_COUNTS,
     });
     if (!user) throw new NotFoundException(NOT_FOUND);
@@ -108,15 +108,15 @@ export class UsersService {
    */
   async create(
     data: CreateUserDto,
-  ): Promise<{ user: UserWithCounts } & TemporaryPasswordResult> {
-    const { temporaryPassword, expiresAt, ...access } =
+  ): Promise<{ usuario: UserWithCounts } & TemporaryPasswordResult> {
+    const { contrasenaTemporal, expiraEn, ...access } =
       await this.temporaryAccess();
     try {
-      const user = await this.prisma.user.create({
+      const user = await this.prisma.usuario.create({
         data: { ...data, ...access },
         include: WITH_COUNTS,
       });
-      return { user, temporaryPassword, expiresAt };
+      return { usuario: user, contrasenaTemporal, expiraEn };
     } catch (error) {
       throw translateDuplicate(error);
     }
@@ -128,16 +128,16 @@ export class UsersService {
    * Si cambia el rol o se desactiva, se cierran sus sesiones.
    */
   async update(
-    userId: string,
+    usuarioId: string,
     data: UpdateUserDto,
     actor: SessionUser,
   ): Promise<UserWithCounts> {
-    const current = await this.findOne(userId);
-    const isRoleChange = data.role !== undefined && data.role !== current.role;
-    const isDeactivation = current.isActive && data.isActive === false;
+    const current = await this.findOne(usuarioId);
+    const isRoleChange = data.rol !== undefined && data.rol !== current.rol;
+    const isDeactivation = current.activo && data.activo === false;
 
-    if (userId === actor.userId) {
-      if (data.isActive === false) {
+    if (usuarioId === actor.usuarioId) {
+      if (data.activo === false) {
         throw new BadRequestException('No puedes desactivar tu propio usuario');
       }
       if (isRoleChange) {
@@ -147,17 +147,17 @@ export class UsersService {
       }
     }
     if (
-      current.role === UserRole.ADMIN &&
-      current.isActive &&
+      current.rol === RolUsuario.ADMINISTRADOR &&
+      current.activo &&
       (isRoleChange || isDeactivation)
     ) {
-      await this.assertAnotherActiveAdmin(userId);
+      await this.assertAnotherActiveAdmin(usuarioId);
     }
 
     let user: UserWithCounts;
     try {
-      user = await this.prisma.user.update({
-        where: { userId },
+      user = await this.prisma.usuario.update({
+        where: { usuarioId },
         data,
         include: WITH_COUNTS,
       });
@@ -167,7 +167,7 @@ export class UsersService {
     // El rol viaja en el JWT: sin esto, con el refresco seguiría renovando un
     // token con el rol viejo. El que ya tiene vence en ACCESS_TOKEN_MINUTES.
     if (isRoleChange || isDeactivation) {
-      await this.sessions.revokeAll({ userId });
+      await this.sessions.revokeAll({ usuarioId });
     }
     return user;
   }
@@ -178,14 +178,14 @@ export class UsersService {
    * quien tenga la anterior no siga dentro.
    */
   async issueTemporaryPassword(
-    userId: string,
+    usuarioId: string,
   ): Promise<TemporaryPasswordResult> {
-    await this.findOne(userId);
-    const { temporaryPassword, expiresAt, ...access } =
+    await this.findOne(usuarioId);
+    const { contrasenaTemporal, expiraEn, ...access } =
       await this.temporaryAccess();
-    await this.prisma.user.update({ where: { userId }, data: access });
-    await this.sessions.revokeAll({ userId });
-    return { temporaryPassword, expiresAt };
+    await this.prisma.usuario.update({ where: { usuarioId }, data: access });
+    await this.sessions.revokeAll({ usuarioId });
+    return { contrasenaTemporal, expiraEn };
   }
 
   /**
@@ -193,22 +193,22 @@ export class UsersService {
    * necesita su autor. Se comprueba antes para decir qué lo impide, en vez del
    * mensaje genérico de la clave foránea. Sus sesiones se borran en cascada.
    */
-  async remove(userId: string, actor: SessionUser): Promise<void> {
-    if (userId === actor.userId) {
+  async remove(usuarioId: string, actor: SessionUser): Promise<void> {
+    if (usuarioId === actor.usuarioId) {
       throw new BadRequestException('No puedes eliminar tu propio usuario');
     }
-    const user = await this.prisma.user.findUnique({
-      where: { userId },
+    const user = await this.prisma.usuario.findUnique({
+      where: { usuarioId },
       select: {
-        role: true,
-        isActive: true,
+        rol: true,
+        activo: true,
         _count: { select: HISTORY_SELECT },
       },
     });
     if (!user) throw new NotFoundException(NOT_FOUND);
 
-    if (user.role === UserRole.ADMIN && user.isActive) {
-      await this.assertAnotherActiveAdmin(userId);
+    if (user.rol === RolUsuario.ADMINISTRADOR && user.activo) {
+      await this.assertAnotherActiveAdmin(usuarioId);
     }
     const history = describeHistory(user._count);
     if (history) {
@@ -216,21 +216,21 @@ export class UsersService {
         `No se puede eliminar: el usuario tiene ${history}. Puedes desactivarlo`,
       );
     }
-    await this.prisma.user.delete({ where: { userId } });
+    await this.prisma.usuario.delete({ where: { usuarioId } });
   }
 
   /** Una temporal nueva, con lo que hay que guardar de ella. */
   private async temporaryAccess() {
-    const temporaryPassword = generateTemporaryPassword();
-    const expiresAt = temporaryPasswordExpiry(
+    const contrasenaTemporal = generateTemporaryPassword();
+    const expiraEn = temporaryPasswordExpiry(
       this.config.getOrThrow<number>('TEMPORARY_PASSWORD_DAYS'),
     );
     return {
-      temporaryPassword,
-      expiresAt,
-      passwordHash: await hashPassword(temporaryPassword),
-      mustChangePassword: true,
-      passwordExpiresAt: expiresAt,
+      contrasenaTemporal,
+      expiraEn,
+      hashContrasena: await hashPassword(contrasenaTemporal),
+      debeCambiarContrasena: true,
+      contrasenaExpiraEn: expiraEn,
     };
   }
 
@@ -239,43 +239,47 @@ export class UsersService {
    * borrado), tiene que quedar otro. Se cuentan solo los activos: uno dado de
    * baja no puede entrar a devolverle el rol a nadie.
    */
-  private async assertAnotherActiveAdmin(userId: string): Promise<void> {
-    const others = await this.prisma.user.count({
-      where: { role: UserRole.ADMIN, isActive: true, NOT: { userId } },
+  private async assertAnotherActiveAdmin(usuarioId: string): Promise<void> {
+    const others = await this.prisma.usuario.count({
+      where: {
+        rol: RolUsuario.ADMINISTRADOR,
+        activo: true,
+        NOT: { usuarioId },
+      },
     });
     if (!others) throw new ConflictException(LAST_ADMIN);
   }
 }
 
 export function usersWhere(
-  query: Pick<ListUsersQueryDto, 'search' | 'role' | 'isActive'>,
-): Prisma.UserWhereInput {
+  query: Pick<ListUsersQueryDto, 'search' | 'rol' | 'activo'>,
+): Prisma.UsuarioWhereInput {
   return {
-    role: query.role,
-    isActive: query.isActive,
+    rol: query.rol,
+    activo: query.activo,
     ...(query.search && {
       OR: [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { email: { contains: query.search, mode: 'insensitive' } },
-        { documentNumber: { contains: query.search.replace(/[\s.-]/g, '') } },
+        { nombre: { contains: query.search, mode: 'insensitive' } },
+        { correo: { contains: query.search, mode: 'insensitive' } },
+        { numeroDocumento: { contains: query.search.replace(/[\s.-]/g, '') } },
       ],
     }),
   };
 }
 
 export function usersOrderBy(
-  query: Pick<ListUsersQueryDto, 'sortBy' | 'sortOrder'>,
-): Prisma.UserOrderByWithRelationInput {
+  query: Pick<ListUsersQueryDto, 'ordenarPor' | 'sentido'>,
+): Prisma.UsuarioOrderByWithRelationInput {
   // Quien nunca entró va al final en los dos sentidos: Postgres pone los
   // vacíos primero al ordenar de forma descendente, y «los últimos en entrar»
   // empezaría por los que nunca entraron.
-  if (query.sortBy === 'lastLoginAt') {
-    return { lastLoginAt: { sort: query.sortOrder, nulls: 'last' } };
+  if (query.ordenarPor === 'ultimoIngresoEn') {
+    return { ultimoIngresoEn: { sort: query.sentido, nulls: 'last' } };
   }
-  return { [query.sortBy]: query.sortOrder };
+  return { [query.ordenarPor]: query.sentido };
 }
 
-/** «2 órdenes asignadas y 1 pago recibido», o vacío si no tiene historial. */
+/** «2 órdenes asignadas y 1 presupuesto enviado», o vacío si no tiene historial. */
 export function describeHistory(counts: HistoryCounts): string {
   const parts = (
     Object.entries(HISTORY_LABELS) as [
@@ -297,7 +301,8 @@ function translateDuplicate(error: unknown): unknown {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002'
   ) {
-    // El índice único que chocó dice cuál de los dos se repite.
+    // El índice único que chocó dice cuál de los dos se repite («document»
+    // calza con numeroDocumento y con la columna numero_documento).
     const target = JSON.stringify(error.meta?.target ?? '');
     return new ConflictException(
       target.includes('document') ? DUPLICATE_DOCUMENT : DUPLICATE_EMAIL,

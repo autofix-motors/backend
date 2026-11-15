@@ -17,7 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -31,7 +31,7 @@ import { Customer } from './entities/customer.entity.js';
 
 /** Los clientes del taller. Solo el administrador los gestiona. */
 @ApiTags('customers')
-@Roles(UserRole.ADMIN)
+@Roles(RolUsuario.ADMINISTRADOR)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
@@ -54,10 +54,10 @@ export class CustomersController {
   @ApiBaseResponse(Customer)
   @ApiNotFoundResponse({ description: 'No se encontró el cliente' })
   async findOne(
-    @Param('customerId', ParseIdPipe) customerId: string,
+    @Param('customerId', ParseIdPipe) clienteId: string,
   ): Promise<BaseResponseDto<Customer>> {
     return BaseResponseDto.success(
-      new Customer(await this.customers.findOne(customerId)),
+      new Customer(await this.customers.findOne(clienteId)),
       'Cliente obtenido',
     );
   }
@@ -84,11 +84,11 @@ export class CustomersController {
     description: 'Ya existe un cliente con ese documento',
   })
   async update(
-    @Param('customerId', ParseIdPipe) customerId: string,
+    @Param('customerId', ParseIdPipe) clienteId: string,
     @Body() dto: UpdateCustomerDto,
   ): Promise<BaseResponseDto<Customer>> {
     return BaseResponseDto.success(
-      new Customer(await this.customers.update(customerId, dto)),
+      new Customer(await this.customers.update(clienteId, dto)),
       'Cliente actualizado',
     );
   }
@@ -101,9 +101,9 @@ export class CustomersController {
     description: 'El cliente tiene vehículos u órdenes registradas',
   })
   async remove(
-    @Param('customerId', ParseIdPipe) customerId: string,
+    @Param('customerId', ParseIdPipe) clienteId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.customers.remove(customerId);
+    await this.customers.remove(clienteId);
     return BaseResponseDto.success(null, 'Cliente eliminado');
   }
 }

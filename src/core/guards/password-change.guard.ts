@@ -28,7 +28,7 @@ export class PasswordChangeGuard implements CanActivate {
       return true;
     }
     const request = context.switchToHttp().getRequest<RequestWithSession>();
-    if (!request.mustChangePassword) return true;
+    if (!request.debeCambiarContrasena) return true;
     if (
       this.reflector.getAllAndOverride<boolean>(
         ALLOW_PENDING_PASSWORD_CHANGE_KEY,

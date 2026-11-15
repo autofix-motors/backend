@@ -1,61 +1,61 @@
 # Glosario
 
-Las traducciones fijas del negocio. El código va en inglés y lo que ve el usuario
-en español; un término se elige **una vez** y se usa igual en la base, la API, el
-frontend y los commits (ver `.claude/rules/nomenclatura.md`).
+Desde 2026-11 el dominio se escribe en español en el código, la base y la API
+(ver `.claude/rules/nomenclatura.md`). Este glosario fija **cómo se escribe cada
+término** y qué clase de NestJS lo maneja, que sigue en inglés porque es
+estructura.
 
 Un término nuevo se agrega aquí **antes** de usarlo, para que no aparezcan dos
-traducciones de lo mismo.
+nombres para lo mismo. Sin tildes ni ñ: `anio`, `contrasena`, `diagnostico`.
 
-| Español | Código | Notas |
-|---|---|---|
-| Usuario, personal | `User` | Quien inicia sesión. Hoy el personal del taller es el conjunto de usuarios |
-| Administrador | `ADMIN` | Valor de `UserRole` |
-| Mecánico | `MECHANIC` | Valor de `UserRole` |
-| Cliente | `Customer` | Persona o empresa dueña del vehículo. No inicia sesión |
-| Tipo de documento | `DocumentType` | `DNI`, `RUC`, `CE` (carné de extranjería), `PASSPORT` |
-| Vehículo | `Vehicle` | |
-| Placa | `plate` | Única. Se guarda en mayúsculas y sin guiones |
-| Kilometraje | `mileage` | En km. `mileageIn` es el del ingreso |
-| Orden de trabajo (OT) | `WorkOrder` | Ruta de la API `/work-orders` |
-| Estado de la OT | `WorkOrderStatus` | Ver los valores abajo |
-| Cambio de estado, línea de tiempo | `WorkOrderEvent` | Cada cambio con fecha, usuario y nota |
-| Nota pública / interna | `isPublic` | La pública la ve el cliente en el seguimiento |
-| Fecha prometida | `promisedDate` | Cuándo se le dijo al cliente que estaría listo |
-| Código de seguimiento | `trackingCode` | Aleatorio, no secuencial (`AFM-7K3Q9X`) |
-| Catálogo de servicios | `ServiceCatalogItem` | Ruta de la API `/service-catalog`. `laborPrice`: precio de mano de obra referencial |
-| Número de orden | `number` | Correlativo interno (OT-000123). No sale en la página pública |
-| Motivo de ingreso | `reason` | Lo que pide el cliente, con sus palabras |
-| Anulación de un pago | `voidedAt`, `voidReason` | Un pago no se borra: se anula |
-| Mano de obra | `labor` | |
-| Presupuesto | `Quote` | Versionado: cada envío es una versión nueva |
-| Estado del presupuesto | `QuoteStatus` | `PENDING` (pendiente), `APPROVED` (aprobado), `REJECTED` (rechazado), `SUPERSEDED` (reemplazado) |
-| Canal de la respuesta | `DecisionChannel` | `PHONE` (llamada), `WHATSAPP`, `IN_PERSON` (en el taller) |
-| Ítem (de OT o de presupuesto) | `WorkOrderItem`, `QuoteItem` | Un servicio o un repuesto, con cantidad y precio. `ItemType`: `SERVICE`, `PRODUCT` |
-| Repuesto, insumo | `Product` | Lo que se consume y tiene stock. `ProductKind`: `PART` (repuesto), `SUPPLY` (insumo) |
-| Unidad de medida | `UnitOfMeasure` | `UNIT`, `LITER`, `GALLON`, `KIT`, `METER` |
-| Herramienta | `Tool` | Se asigna, no se consume. `ToolStatus`: `AVAILABLE` (operativa), `IN_REPAIR`, `RETIRED` (de baja) |
-| Movimiento de stock, kardex | `StockMovement` | `StockMovementType`: `PURCHASE` (compra), `WORK_ORDER` (consumo en OT), `ADJUSTMENT` (ajuste) |
-| Stock mínimo | `minStock` | Debajo de este valor se alerta |
-| Costo / precio de venta | `cost` / `price` | En soles (PEN) |
-| Margen | `margin` | `price − cost`, en soles. Se calcula al responder y solo lo ve `ADMIN` |
-| Stock bajo | `isLowStock`, `lowStock` | El stock está en el mínimo o debajo (`stock <= minStock`) |
-| Pago | `Payment` | Uno o varios por OT; un adelanto es un pago |
-| Método de pago | `PaymentMethod` | `CASH`, `YAPE_PLIN`, `CARD`, `TRANSFER` |
-| Seguimiento | `tracking` | La página pública y su módulo |
+## Entidades
 
-## Estados de la orden de trabajo
+| Modelo | Qué es | Módulo (estructura) | Ruta de la API |
+|---|---|---|---|
+| `Usuario` | Personal del taller que inicia sesión: administrador o mecánico | `modules/core/users` | `/users` |
+| `Sesion` | Sesión iniciada (token de refresco rotado) | `modules/core/sessions` | — |
+| `CuentaCliente` | Acceso del cliente a su portal | `modules/core/customer-accounts` | `/customer-accounts` |
+| `Cliente` | Persona o empresa dueña del vehículo | `modules/customer/customers` | `/customers` |
+| `Vehiculo` | Lo que entra al taller; placa única | `modules/customer/vehicles` | `/vehicles` |
+| `Servicio` | Servicio del catálogo con precio referencial de mano de obra | `modules/workshop/service-catalog` | `/service-catalog` |
+| `Producto` | Repuesto o insumo con stock | `modules/inventory/products` | `/products` |
+| `MovimientoStock` | Kardex: compra, consumo en una orden o ajuste | `modules/inventory/stock-movements` | `/stock-movements` |
+| `OrdenTrabajo` | Orden de trabajo (OT): un ingreso del vehículo | `modules/workshop/work-orders` | `/work-orders` |
+| `EventoOrden` | Cambio de estado o nota de la línea de tiempo | `modules/workshop/work-orders` | — |
+| `DetalleOrden` | Lo que se cobra: un servicio o un repuesto | `modules/workshop/work-orders` | `/work-orders/:id/items` |
+| `Presupuesto` | Propuesta al cliente, versionada | `modules/workshop/work-orders` | `/work-orders/:id/quotes` |
+| `DetallePresupuesto` | Copia de los detalles al enviar el presupuesto | `modules/workshop/work-orders` | — |
 
-| Español | Código |
+## Campos que conviene conocer
+
+| Campo | Significado |
 |---|---|
-| Recibido | `RECEIVED` |
-| En diagnóstico | `DIAGNOSIS` |
-| Esperando aprobación | `WAITING_APPROVAL` |
-| En reparación | `IN_PROGRESS` |
-| Esperando repuestos | `WAITING_PARTS` |
-| Listo para recoger | `READY` |
-| Entregado | `DELIVERED` |
-| Cancelado | `CANCELLED` |
+| `kilometrajeIngreso` | Kilometraje al ingreso, en km |
+| `fechaPrometida` | Cuándo se le dijo al cliente que estaría listo |
+| `codigoSeguimiento` | Aleatorio, no secuencial (`AFM-7K3Q9X`) |
+| `numero` | Correlativo interno de la orden (OT-000123); no se muestra al cliente |
+| `motivo` | Lo que pide el cliente, con sus palabras |
+| `esPublico` | El evento lo ve el cliente en su portal |
+| `precioManoObra` | Precio referencial de un servicio |
+| `stockMinimo`, `stockBajo` | Debajo de este valor se alerta (`stock <= stockMinimo`) |
+| `costo`, `precio`, `margen` | En soles. El margen (`precio − costo`) solo lo ve el administrador |
+| `canalDecision` | Por dónde respondió el cliente al presupuesto |
+| `miembroDesde` | En «Mi perfil» (`GET /auth/profile`): el `creadoEn` del usuario o del cliente |
+
+## Enums
+
+| Enum | Valores |
+|---|---|
+| `RolUsuario` | `ADMINISTRADOR`, `MECANICO`. La sesión del cliente usa el rol `CLIENTE` |
+| `TipoDocumento` | `DNI`, `RUC`, `CE` (carné de extranjería), `PASAPORTE` |
+| `EstadoOrden` | `RECIBIDO`, `EN_DIAGNOSTICO`, `ESPERANDO_APROBACION`, `EN_REPARACION`, `ESPERANDO_REPUESTOS`, `LISTO`, `ENTREGADO`, `CANCELADO` |
+| `TipoDetalle` | `SERVICIO`, `PRODUCTO` |
+| `EstadoPresupuesto` | `PENDIENTE`, `APROBADO`, `RECHAZADO`, `REEMPLAZADO` |
+| `CanalDecision` | `TELEFONO`, `WHATSAPP`, `EN_PERSONA`, `PORTAL` |
+| `TipoProducto` | `REPUESTO`, `INSUMO` |
+| `UnidadMedida` | `UNIDAD`, `LITRO`, `GALON`, `KIT`, `METRO` |
+| `TipoMovimiento` | `COMPRA`, `ORDEN_TRABAJO`, `AJUSTE` |
+| `TipoPerfil` | `PERSONAL`, `CLIENTE`: de quién es «Mi perfil». Solo en la API, no es un enum de la base |
 
 ## Términos que se quedan como están
 
@@ -63,5 +63,6 @@ traducciones de lo mismo.
 
 ## Claves primarias
 
-Cada modelo tiene su clave primaria como `<entidad>Id` (`customerId`,
-`workOrderId`), nunca `id`. Ver `.claude/rules/nomenclatura.md`.
+Cada modelo tiene su clave primaria como `<entidad>Id` (`clienteId`,
+`ordenTrabajoId`), nunca `id`. La clave foránea se llama igual que la primaria a
+la que apunta.

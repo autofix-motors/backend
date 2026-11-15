@@ -20,69 +20,68 @@ import {
 // a sí mismo, que siempre quede un administrador activo, cuándo se cierran las
 // sesiones y que un usuario con historial no se borre.
 
-const ADMIN = { userId: 'a1', role: 'ADMIN' as const };
+const ADMIN = { usuarioId: 'a1', rol: 'ADMINISTRADOR' as const };
 
 const NO_HISTORY = {
-  assignedWorkOrders: 0,
-  createdWorkOrders: 0,
-  workOrderEvents: 0,
-  sentQuotes: 0,
-  decidedQuotes: 0,
-  stockMovements: 0,
-  assignedTools: 0,
-  receivedPayments: 0,
-  voidedPayments: 0,
+  ordenesAsignadas: 0,
+  ordenesCreadas: 0,
+  eventosOrden: 0,
+  presupuestosEnviados: 0,
+  presupuestosDecididos: 0,
+  movimientosStock: 0,
 };
 
 function user(overrides: Record<string, unknown> = {}) {
   return {
-    userId: 'u1',
-    email: 'jquispe@autofix.local',
-    name: 'Juan Quispe',
-    role: 'MECHANIC',
-    isActive: true,
-    _count: { assignedWorkOrders: 0 },
+    usuarioId: 'u1',
+    correo: 'jquispe@autofix.local',
+    nombre: 'Juan Quispe',
+    rol: 'MECANICO',
+    activo: true,
+    _count: { ordenesAsignadas: 0 },
     ...overrides,
   };
 }
 
 describe('usersWhere', () => {
   it('sin búsqueda ni filtros no restringe nada', () => {
-    expect(usersWhere({})).toEqual({ role: undefined, isActive: undefined });
+    expect(usersWhere({})).toEqual({ rol: undefined, activo: undefined });
   });
 
   it('busca en el nombre, el correo y el DNI, y filtra por rol y estado', () => {
     const text = { contains: 'quispe', mode: 'insensitive' };
     expect(
-      usersWhere({ search: 'quispe', role: 'MECHANIC', isActive: false }),
+      usersWhere({ search: 'quispe', rol: 'MECANICO', activo: false }),
     ).toEqual({
-      role: 'MECHANIC',
-      isActive: false,
+      rol: 'MECANICO',
+      activo: false,
       OR: [
-        { name: text },
-        { email: text },
-        { documentNumber: { contains: 'quispe' } },
+        { nombre: text },
+        { correo: text },
+        { numeroDocumento: { contains: 'quispe' } },
       ],
     });
   });
 
   it('busca el DNI sin puntos ni espacios', () => {
     expect(usersWhere({ search: '45.678 912' }).OR).toContainEqual({
-      documentNumber: { contains: '45678912' },
+      numeroDocumento: { contains: '45678912' },
     });
   });
 });
 
 describe('usersOrderBy', () => {
   it('ordena por el campo pedido', () => {
-    expect(usersOrderBy({ sortBy: 'name', sortOrder: 'asc' })).toEqual({
-      name: 'asc',
+    expect(usersOrderBy({ ordenarPor: 'nombre', sentido: 'asc' })).toEqual({
+      nombre: 'asc',
     });
   });
 
   it('deja al final a quien nunca inició sesión, también en descendente', () => {
-    expect(usersOrderBy({ sortBy: 'lastLoginAt', sortOrder: 'desc' })).toEqual({
-      lastLoginAt: { sort: 'desc', nulls: 'last' },
+    expect(
+      usersOrderBy({ ordenarPor: 'ultimoIngresoEn', sentido: 'desc' }),
+    ).toEqual({
+      ultimoIngresoEn: { sort: 'desc', nulls: 'last' },
     });
   });
 });
@@ -96,18 +95,20 @@ describe('describeHistory', () => {
     expect(
       describeHistory({
         ...NO_HISTORY,
-        assignedWorkOrders: 3,
-        receivedPayments: 1,
-        stockMovements: 2,
+        ordenesAsignadas: 3,
+        presupuestosEnviados: 1,
+        movimientosStock: 2,
       }),
-    ).toBe('3 órdenes asignadas, 2 movimientos de stock y 1 pago recibido');
+    ).toBe(
+      '3 órdenes asignadas, 1 presupuesto enviado y 2 movimientos de stock',
+    );
   });
 });
 
 describe('UsersService', () => {
   const prisma = {
     $transaction: vi.fn((queries: unknown[]) => Promise.all(queries)),
-    user: {
+    usuario: {
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
@@ -127,21 +128,21 @@ describe('UsersService', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('pagina el listado con desempate por id', async () => {
-    prisma.user.findMany.mockResolvedValue([user()]);
-    prisma.user.count.mockResolvedValue(12);
+    prisma.usuario.findMany.mockResolvedValue([user()]);
+    prisma.usuario.count.mockResolvedValue(12);
 
     const page = await service.findAll({
       page: 2,
       pageSize: 10,
-      sortBy: 'name',
-      sortOrder: 'asc',
+      ordenarPor: 'nombre',
+      sentido: 'asc',
     });
 
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         skip: 10,
         take: 10,
-        orderBy: [{ name: 'asc' }, { userId: 'asc' }],
+        orderBy: [{ nombre: 'asc' }, { usuarioId: 'asc' }],
       }),
     );
     expect(page.meta).toEqual({
@@ -154,54 +155,57 @@ describe('UsersService', () => {
 
   describe('create', () => {
     it('genera una temporal: guarda su hash con la marca y la devuelve una vez', async () => {
-      prisma.user.create.mockResolvedValue(user());
+      prisma.usuario.create.mockResolvedValue(user());
 
       const result = await service.create({
-        email: 'jquispe@autofix.local',
-        documentNumber: '45678912',
-        name: 'Juan Quispe',
-        role: 'MECHANIC',
+        correo: 'jquispe@autofix.local',
+        numeroDocumento: '45678912',
+        nombre: 'Juan Quispe',
+        rol: 'MECANICO',
       });
 
-      const { data } = prisma.user.create.mock.calls[0][0] as {
+      const { data } = prisma.usuario.create.mock.calls[0][0] as {
         data: Record<string, unknown>;
       };
-      expect(data).not.toHaveProperty('temporaryPassword');
+      expect(data).not.toHaveProperty('contrasenaTemporal');
       expect(data).toMatchObject({
-        documentNumber: '45678912',
-        mustChangePassword: true,
-        passwordExpiresAt: result.expiresAt,
+        numeroDocumento: '45678912',
+        debeCambiarContrasena: true,
+        contrasenaExpiraEn: result.expiraEn,
       });
-      expect(String(data.passwordHash)).toMatch(/^\$argon2id\$/);
-      expect(result.temporaryPassword).toHaveLength(12);
+      expect(String(data.hashContrasena)).toMatch(/^\$argon2id\$/);
+      expect(result.contrasenaTemporal).toHaveLength(12);
       expect(
-        await argon2.verify(String(data.passwordHash), result.temporaryPassword),
+        await argon2.verify(
+          String(data.hashContrasena),
+          result.contrasenaTemporal,
+        ),
       ).toBe(true);
     });
 
     it('traduce un correo o un DNI repetido a un 409 claro', async () => {
       const dto = {
-        email: 'jquispe@autofix.local',
-        documentNumber: '45678912',
-        name: 'Juan',
-        role: 'MECHANIC' as const,
+        correo: 'jquispe@autofix.local',
+        numeroDocumento: '45678912',
+        nombre: 'Juan',
+        rol: 'MECANICO' as const,
       };
-      prisma.user.create.mockRejectedValue(
+      prisma.usuario.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('duplicado', {
           code: 'P2002',
           clientVersion: 'test',
-          meta: { target: ['email'] },
+          meta: { target: ['correo'] },
         }),
       );
       await expect(service.create(dto)).rejects.toThrow(
         new ConflictException('Ya existe un usuario con ese correo'),
       );
 
-      prisma.user.create.mockRejectedValue(
+      prisma.usuario.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('duplicado', {
           code: 'P2002',
           clientVersion: 'test',
-          meta: { target: ['document_number'] },
+          meta: { target: ['numero_documento'] },
         }),
       );
       await expect(service.create(dto)).rejects.toThrow(
@@ -212,106 +216,106 @@ describe('UsersService', () => {
 
   describe('update', () => {
     it('no deja que el administrador se desactive a sí mismo', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ userId: 'a1', role: 'ADMIN' }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ usuarioId: 'a1', rol: 'ADMINISTRADOR' }),
       );
       await expect(
-        service.update('a1', { isActive: false }, ADMIN),
+        service.update('a1', { activo: false }, ADMIN),
       ).rejects.toThrow(
         new BadRequestException('No puedes desactivar tu propio usuario'),
       );
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.usuario.update).not.toHaveBeenCalled();
     });
 
     it('no deja que el administrador se quite el rol', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ userId: 'a1', role: 'ADMIN' }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ usuarioId: 'a1', rol: 'ADMINISTRADOR' }),
       );
       await expect(
-        service.update('a1', { role: 'MECHANIC' }, ADMIN),
+        service.update('a1', { rol: 'MECANICO' }, ADMIN),
       ).rejects.toThrow(
         new BadRequestException('No puedes quitarte el rol de administrador'),
       );
     });
 
     it('deja que el administrador edite sus propios datos', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ userId: 'a1', role: 'ADMIN' }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ usuarioId: 'a1', rol: 'ADMINISTRADOR' }),
       );
-      prisma.user.update.mockResolvedValue(user({ userId: 'a1' }));
+      prisma.usuario.update.mockResolvedValue(user({ usuarioId: 'a1' }));
 
       await service.update(
         'a1',
-        { name: 'Ana', role: 'ADMIN', isActive: true },
+        { nombre: 'Ana', rol: 'ADMINISTRADOR', activo: true },
         ADMIN,
       );
 
-      expect(prisma.user.update).toHaveBeenCalled();
+      expect(prisma.usuario.update).toHaveBeenCalled();
       expect(sessions.revokeAll).not.toHaveBeenCalled();
     });
 
     it('no degrada ni desactiva al último administrador activo', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ userId: 'a2', role: 'ADMIN' }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ usuarioId: 'a2', rol: 'ADMINISTRADOR' }),
       );
-      prisma.user.count.mockResolvedValue(0);
+      prisma.usuario.count.mockResolvedValue(0);
 
-      for (const change of [{ role: 'MECHANIC' }, { isActive: false }]) {
+      for (const change of [{ rol: 'MECANICO' }, { activo: false }]) {
         await expect(
           service.update('a2', change as never, ADMIN),
         ).rejects.toThrow(ConflictException);
       }
-      expect(prisma.user.count).toHaveBeenCalledWith({
-        where: { role: 'ADMIN', isActive: true, NOT: { userId: 'a2' } },
+      expect(prisma.usuario.count).toHaveBeenCalledWith({
+        where: { rol: 'ADMINISTRADOR', activo: true, NOT: { usuarioId: 'a2' } },
       });
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.usuario.update).not.toHaveBeenCalled();
     });
 
     it('al desactivar a alguien cierra sus sesiones', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
-      prisma.user.update.mockResolvedValue(user({ isActive: false }));
+      prisma.usuario.findUnique.mockResolvedValue(user());
+      prisma.usuario.update.mockResolvedValue(user({ activo: false }));
 
-      await service.update('u1', { isActive: false }, ADMIN);
+      await service.update('u1', { activo: false }, ADMIN);
 
-      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'u1' });
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ usuarioId: 'u1' });
     });
 
     it('al cambiarle el rol cierra sus sesiones, si queda otro administrador', async () => {
-      prisma.user.findUnique.mockResolvedValue(
-        user({ userId: 'a2', role: 'ADMIN' }),
+      prisma.usuario.findUnique.mockResolvedValue(
+        user({ usuarioId: 'a2', rol: 'ADMINISTRADOR' }),
       );
-      prisma.user.count.mockResolvedValue(1);
-      prisma.user.update.mockResolvedValue(user({ userId: 'a2' }));
+      prisma.usuario.count.mockResolvedValue(1);
+      prisma.usuario.update.mockResolvedValue(user({ usuarioId: 'a2' }));
 
-      await service.update('a2', { role: 'MECHANIC' }, ADMIN);
+      await service.update('a2', { rol: 'MECANICO' }, ADMIN);
 
-      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'a2' });
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ usuarioId: 'a2' });
     });
 
     it('editar datos sin cambiar rol ni estado no cierra sesiones', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
-      prisma.user.update.mockResolvedValue(user());
+      prisma.usuario.findUnique.mockResolvedValue(user());
+      prisma.usuario.update.mockResolvedValue(user());
 
       await service.update(
         'u1',
-        { phone: '987654321', role: 'MECHANIC', isActive: true },
+        { telefono: '987654321', rol: 'MECANICO', activo: true },
         ADMIN,
       );
 
-      expect(prisma.user.count).not.toHaveBeenCalled();
+      expect(prisma.usuario.count).not.toHaveBeenCalled();
       expect(sessions.revokeAll).not.toHaveBeenCalled();
     });
 
     it('traduce un correo repetido a un 409 claro', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
-      prisma.user.update.mockRejectedValue(
+      prisma.usuario.findUnique.mockResolvedValue(user());
+      prisma.usuario.update.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('duplicado', {
           code: 'P2002',
           clientVersion: 'test',
         }),
       );
       await expect(
-        service.update('u1', { email: 'otro@autofix.local' }, ADMIN),
+        service.update('u1', { correo: 'otro@autofix.local' }, ADMIN),
       ).rejects.toThrow(
         new ConflictException('Ya existe un usuario con ese correo'),
       );
@@ -320,23 +324,23 @@ describe('UsersService', () => {
 
   describe('issueTemporaryPassword', () => {
     it('guarda una temporal nueva con la marca y cierra sus sesiones', async () => {
-      prisma.user.findUnique.mockResolvedValue(user());
-      prisma.user.update.mockResolvedValue(user());
+      prisma.usuario.findUnique.mockResolvedValue(user());
+      prisma.usuario.update.mockResolvedValue(user());
 
       const result = await service.issueTemporaryPassword('u1');
 
-      const { data } = prisma.user.update.mock.calls[0][0] as {
-        data: { passwordHash: string; mustChangePassword: boolean };
+      const { data } = prisma.usuario.update.mock.calls[0][0] as {
+        data: { hashContrasena: string; debeCambiarContrasena: boolean };
       };
-      expect(data.mustChangePassword).toBe(true);
+      expect(data.debeCambiarContrasena).toBe(true);
       expect(
-        await argon2.verify(data.passwordHash, result.temporaryPassword),
+        await argon2.verify(data.hashContrasena, result.contrasenaTemporal),
       ).toBe(true);
-      expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: 'u1' });
+      expect(sessions.revokeAll).toHaveBeenCalledWith({ usuarioId: 'u1' });
     });
 
     it('responde 404 si el usuario no existe', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.usuario.findUnique.mockResolvedValue(null);
       await expect(service.issueTemporaryPassword('u1')).rejects.toThrow(
         NotFoundException,
       );
@@ -349,50 +353,50 @@ describe('UsersService', () => {
       await expect(service.remove('a1', ADMIN)).rejects.toThrow(
         new BadRequestException('No puedes eliminar tu propio usuario'),
       );
-      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
     });
 
     it('no borra a un usuario con historial, y dice por qué', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        role: 'MECHANIC',
-        isActive: true,
-        _count: { ...NO_HISTORY, assignedWorkOrders: 2, workOrderEvents: 1 },
+      prisma.usuario.findUnique.mockResolvedValue({
+        rol: 'MECANICO',
+        activo: true,
+        _count: { ...NO_HISTORY, ordenesAsignadas: 2, eventosOrden: 1 },
       });
       await expect(service.remove('u1', ADMIN)).rejects.toThrow(
         new ConflictException(
           'No se puede eliminar: el usuario tiene 2 órdenes asignadas y 1 nota o cambio de estado en una orden. Puedes desactivarlo',
         ),
       );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.usuario.delete).not.toHaveBeenCalled();
     });
 
     it('no borra al último administrador activo', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        role: 'ADMIN',
-        isActive: true,
+      prisma.usuario.findUnique.mockResolvedValue({
+        rol: 'ADMINISTRADOR',
+        activo: true,
         _count: NO_HISTORY,
       });
-      prisma.user.count.mockResolvedValue(0);
+      prisma.usuario.count.mockResolvedValue(0);
       await expect(service.remove('a2', ADMIN)).rejects.toThrow(
         ConflictException,
       );
-      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.usuario.delete).not.toHaveBeenCalled();
     });
 
     it('borra de verdad a un usuario sin historial', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        role: 'MECHANIC',
-        isActive: false,
+      prisma.usuario.findUnique.mockResolvedValue({
+        rol: 'MECANICO',
+        activo: false,
         _count: NO_HISTORY,
       });
       await service.remove('u1', ADMIN);
-      expect(prisma.user.delete).toHaveBeenCalledWith({
-        where: { userId: 'u1' },
+      expect(prisma.usuario.delete).toHaveBeenCalledWith({
+        where: { usuarioId: 'u1' },
       });
     });
 
     it('responde 404 al borrar un usuario que no existe', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.usuario.findUnique.mockResolvedValue(null);
       await expect(service.remove('u1', ADMIN)).rejects.toThrow(
         NotFoundException,
       );

@@ -1,17 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export type BrandCount = { brand: string; vehiclesCount: number };
+export type BrandCount = { marca: string; cantidadVehiculos: number };
 
 /** Una marca registrada y cuántos vehículos la tienen: las opciones del filtro. */
 export class VehicleBrand {
-  constructor({ brand, vehiclesCount }: BrandCount) {
-    this.brand = brand;
-    this.vehiclesCount = vehiclesCount;
+  constructor({ marca, cantidadVehiculos }: BrandCount) {
+    this.marca = marca;
+    this.cantidadVehiculos = cantidadVehiculos;
   }
 
   @ApiProperty({ example: 'Toyota' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 12 })
-  vehiclesCount: number;
+  cantidadVehiculos: number;
 }

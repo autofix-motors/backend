@@ -15,55 +15,55 @@ describe('ListWorkOrdersQueryDto', () => {
   it('por defecto, lo último que entró primero', async () => {
     const { dto, messages } = await check({});
     expect(messages).toEqual([]);
-    expect(dto).toMatchObject({ sortBy: 'receivedAt', sortOrder: 'desc' });
+    expect(dto).toMatchObject({ ordenarPor: 'recibidaEn', sentido: 'desc' });
   });
 
   it('el estado llega separado por comas y se vuelve una lista', async () => {
     const { dto, messages } = await check({
-      status: 'RECEIVED, DIAGNOSIS,',
+      estado: 'RECIBIDO, EN_DIAGNOSTICO,',
     });
     expect(messages).toEqual([]);
-    expect(dto.status).toEqual(['RECEIVED', 'DIAGNOSIS']);
-    expect((await check({ status: '' })).dto.status).toBeUndefined();
-    expect((await check({ status: 'READY' })).dto.status).toEqual(['READY']);
+    expect(dto.estado).toEqual(['RECIBIDO', 'EN_DIAGNOSTICO']);
+    expect((await check({ estado: '' })).dto.estado).toBeUndefined();
+    expect((await check({ estado: 'LISTO' })).dto.estado).toEqual(['LISTO']);
   });
 
   it('rechaza un estado que no existe', async () => {
-    expect((await check({ status: 'READY,FINISHED' })).messages).toEqual([
+    expect((await check({ estado: 'LISTO,FINISHED' })).messages).toEqual([
       'El estado no es válido',
     ]);
   });
 
   it('vencidas, rango de días y los filtros por id', async () => {
     const { dto, messages } = await check({
-      overdue: 'true',
-      from: '2026-10-01',
-      to: '2026-10-31',
-      mechanicId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-      vehicleId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-      customerId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-      sortBy: 'promisedDate',
+      vencidas: 'true',
+      desde: '2026-10-01',
+      hasta: '2026-10-31',
+      mecanicoId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+      vehiculoId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+      clienteId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+      ordenarPor: 'fechaPrometida',
     });
     expect(messages).toEqual([]);
-    expect(dto.overdue).toBe(true);
-    expect((await check({ overdue: 'false' })).dto.overdue).toBe(false);
+    expect(dto.vencidas).toBe(true);
+    expect((await check({ vencidas: 'false' })).dto.vencidas).toBe(false);
   });
 
   it('rechaza lo que no se entiende', async () => {
     expect(
       (
         await check({
-          overdue: 'si',
-          from: '2026-02-30',
-          vehicleId: '123',
-          sortBy: 'status',
+          vencidas: 'si',
+          desde: '2026-02-30',
+          vehiculoId: '123',
+          ordenarPor: 'estado',
         })
       ).messages,
     ).toEqual([
       'El vehículo no es válido',
       'El filtro de vencidas es true o false',
       'La fecha desde es un día con el formato AAAA-MM-DD, por ejemplo 2026-10-04',
-      'Se ordena por receivedAt, promisedDate o number',
+      'Se ordena por recibidaEn, fechaPrometida o numero',
     ]);
   });
 });

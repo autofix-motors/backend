@@ -7,14 +7,14 @@ import { normalizeDocumentNumber } from '../../shared/document-number.js';
  * y «45.678.912» encuentran lo mismo que se registró.
  */
 export interface LoginIdentifier {
-  kind: 'email' | 'document';
-  value: string;
+  tipo: 'correo' | 'documento';
+  valor: string;
 }
 
 export function normalizeLoginIdentifier(raw: string): LoginIdentifier {
   const trimmed = raw.trim();
   if (trimmed.includes('@')) {
-    return { kind: 'email', value: trimmed.toLowerCase() };
+    return { tipo: 'correo', valor: trimmed.toLowerCase() };
   }
-  return { kind: 'document', value: normalizeDocumentNumber(trimmed) };
+  return { tipo: 'documento', valor: normalizeDocumentNumber(trimmed) };
 }

@@ -28,16 +28,16 @@ async function check<T extends object>(
 describe('CreateWorkOrderNoteDto', () => {
   it('pide la nota y si es pública, sin suponerlo', async () => {
     expect(
-      (await check(CreateWorkOrderNoteDto, { note: '  ' })).messages,
+      (await check(CreateWorkOrderNoteDto, { nota: '  ' })).messages,
     ).toEqual([
       'Escribe la nota',
       'Indica si el cliente ve la nota (true o false)',
     ]);
     const { dto, messages } = await check(CreateWorkOrderNoteDto, {
-      note: ' Repuesto en camino ',
-      isPublic: true,
+      nota: ' Repuesto en camino ',
+      esPublico: true,
     });
     expect(messages).toEqual([]);
-    expect(dto.note).toBe('Repuesto en camino');
+    expect(dto.nota).toBe('Repuesto en camino');
   });
 });

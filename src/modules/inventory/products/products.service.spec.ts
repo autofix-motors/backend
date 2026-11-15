@@ -18,49 +18,49 @@ import {
 
 // En los tests basta un marcador: lo que importa es que el filtro use la
 // referencia a la columna y no un valor.
-const MIN_STOCK = 'minStock-column' as unknown as Prisma.FieldRef<
-  'Product',
+const MIN_STOCK = 'stockMinimo-column' as unknown as Prisma.FieldRef<
+  'Producto',
   'Decimal'
 >;
 
 const valid = {
-  code: 'FA-001',
-  name: 'Filtro de aceite',
-  kind: 'PART' as const,
-  unit: 'UNIT' as const,
-  minStock: '4',
-  cost: '12.50',
-  price: '25',
+  codigo: 'FA-001',
+  nombre: 'Filtro de aceite',
+  tipo: 'REPUESTO' as const,
+  unidad: 'UNIDAD' as const,
+  stockMinimo: '4',
+  costo: '12.50',
+  precio: '25',
 };
 
 describe('productsWhere', () => {
   it('sin búsqueda ni filtros no restringe nada', () => {
     expect(productsWhere({}, MIN_STOCK)).toEqual({
-      kind: undefined,
-      isActive: undefined,
+      tipo: undefined,
+      activo: undefined,
     });
   });
 
   it('busca en el código, el nombre y la marca, sin distinguir mayúsculas', () => {
     const text = { contains: 'bosch', mode: 'insensitive' };
     expect(productsWhere({ search: 'bosch' }, MIN_STOCK).OR).toEqual([
-      { code: text },
-      { name: text },
-      { brand: text },
+      { codigo: text },
+      { nombre: text },
+      { marca: text },
     ]);
   });
 
   it('filtra por tipo y estado', () => {
-    expect(
-      productsWhere({ kind: 'SUPPLY', isActive: false }, MIN_STOCK),
-    ).toEqual({ kind: 'SUPPLY', isActive: false });
+    expect(productsWhere({ tipo: 'INSUMO', activo: false }, MIN_STOCK)).toEqual(
+      { tipo: 'INSUMO', activo: false },
+    );
   });
 
   it('el stock bajo compara el stock con el mínimo de la misma fila', () => {
-    expect(productsWhere({ lowStock: true }, MIN_STOCK).stock).toEqual({
+    expect(productsWhere({ stockBajo: true }, MIN_STOCK).stock).toEqual({
       lte: MIN_STOCK,
     });
-    expect(productsWhere({ lowStock: false }, MIN_STOCK).stock).toEqual({
+    expect(productsWhere({ stockBajo: false }, MIN_STOCK).stock).toEqual({
       gt: MIN_STOCK,
     });
   });
@@ -69,8 +69,8 @@ describe('productsWhere', () => {
 describe('ProductsService', () => {
   const prisma = {
     $transaction: vi.fn((queries: unknown[]) => Promise.all(queries)),
-    product: {
-      fields: { minStock: MIN_STOCK },
+    producto: {
+      fields: { stockMinimo: MIN_STOCK },
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
@@ -92,31 +92,31 @@ describe('ProductsService', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('pagina el listado, filtra el stock bajo y desempata el orden por el id', async () => {
-    prisma.product.findMany.mockResolvedValue([]);
-    prisma.product.count.mockResolvedValue(25);
+    prisma.producto.findMany.mockResolvedValue([]);
+    prisma.producto.count.mockResolvedValue(25);
 
     const page = await service.findAll({
       page: 3,
       pageSize: 10,
-      lowStock: true,
-      sortBy: 'stock',
-      sortOrder: 'asc',
+      stockBajo: true,
+      ordenarPor: 'stock',
+      sentido: 'asc',
     });
 
-    expect(prisma.product.findMany).toHaveBeenCalledWith({
+    expect(prisma.producto.findMany).toHaveBeenCalledWith({
       where: {
-        kind: undefined,
-        isActive: undefined,
+        tipo: undefined,
+        activo: undefined,
         stock: { lte: MIN_STOCK },
       },
-      orderBy: [{ stock: 'asc' }, { productId: 'asc' }],
+      orderBy: [{ stock: 'asc' }, { productoId: 'asc' }],
       skip: 20,
       take: 10,
     });
-    expect(prisma.product.count).toHaveBeenCalledWith({
+    expect(prisma.producto.count).toHaveBeenCalledWith({
       where: {
-        kind: undefined,
-        isActive: undefined,
+        tipo: undefined,
+        activo: undefined,
         stock: { lte: MIN_STOCK },
       },
     });
@@ -128,42 +128,80 @@ describe('ProductsService', () => {
     });
   });
 
+  it('el stock bajo trae los activos bajo su mínimo, los que más les falta primero', async () => {
+    const low = (nombre: string, stock: string, stockMinimo: string) => ({
+      productoId: nombre,
+      codigo: nombre.toUpperCase(),
+      nombre,
+      unidad: 'UNIDAD',
+      stock: new Prisma.Decimal(stock),
+      stockMinimo: new Prisma.Decimal(stockMinimo),
+    });
+    prisma.producto.findMany.mockResolvedValue([
+      low('pastillas', '3', '4'), // le falta 1
+      low('aceite', '0', '6'), // le falta 6
+      low('bujias', '2', '3'), // le falta 1: empata con pastillas
+      low('filtro', '4', '4'), // en el mínimo: le falta 0
+    ]);
+
+    const { total, productos } = await service.lowStock(3);
+
+    expect(prisma.producto.findMany).toHaveBeenCalledWith({
+      where: { tipo: undefined, activo: true, stock: { lte: MIN_STOCK } },
+      select: {
+        productoId: true,
+        codigo: true,
+        nombre: true,
+        stock: true,
+        stockMinimo: true,
+        unidad: true,
+      },
+    });
+    // El total cuenta todos aunque solo salgan tres.
+    expect(total).toBe(4);
+    expect(productos.map((p) => p.nombre)).toEqual([
+      'aceite',
+      'bujias',
+      'pastillas',
+    ]);
+  });
+
   it('traduce el código repetido de la base (P2002) a un 409 propio', async () => {
-    prisma.product.create.mockRejectedValue(p2002());
+    prisma.producto.create.mockRejectedValue(p2002());
     await expect(service.create(valid)).rejects.toThrow(DUPLICATE);
   });
 
   it('también al cambiarle el código a uno que ya existe', async () => {
-    prisma.product.findUnique.mockResolvedValue({ productId: 'p1' });
-    prisma.product.update.mockRejectedValue(p2002());
-    await expect(service.update('p1', { code: 'FA-002' })).rejects.toThrow(
+    prisma.producto.findUnique.mockResolvedValue({ productoId: 'p1' });
+    prisma.producto.update.mockRejectedValue(p2002());
+    await expect(service.update('p1', { codigo: 'FA-002' })).rejects.toThrow(
       DUPLICATE,
     );
   });
 
   it('responde 404 al editar un producto que no existe', async () => {
-    prisma.product.findUnique.mockResolvedValue(null);
-    await expect(service.update('p1', { isActive: false })).rejects.toThrow(
+    prisma.producto.findUnique.mockResolvedValue(null);
+    await expect(service.update('p1', { activo: false })).rejects.toThrow(
       NotFoundException,
     );
-    expect(prisma.product.update).not.toHaveBeenCalled();
+    expect(prisma.producto.update).not.toHaveBeenCalled();
   });
 
   it('no borra un producto con movimientos ni ítems de órdenes, y dice por qué', async () => {
-    prisma.product.findUnique.mockResolvedValue({
-      _count: { movements: 3, workOrderItems: 1 },
+    prisma.producto.findUnique.mockResolvedValue({
+      _count: { movimientos: 3, detallesOrden: 1 },
     });
     await expect(service.remove('p1')).rejects.toThrow(
       new ConflictException(
         'No se puede eliminar: el producto tiene historial (3 movimientos de stock y 1 ítem de órdenes de trabajo). Puedes desactivarlo para que deje de ofrecerse',
       ),
     );
-    expect(prisma.product.delete).not.toHaveBeenCalled();
+    expect(prisma.producto.delete).not.toHaveBeenCalled();
   });
 
   it('nombra solo el historial que tiene', async () => {
-    prisma.product.findUnique.mockResolvedValue({
-      _count: { movements: 1, workOrderItems: 0 },
+    prisma.producto.findUnique.mockResolvedValue({
+      _count: { movimientos: 1, detallesOrden: 0 },
     });
     await expect(service.remove('p1')).rejects.toThrow(
       'No se puede eliminar: el producto tiene historial (1 movimiento de stock). Puedes desactivarlo para que deje de ofrecerse',
@@ -171,17 +209,17 @@ describe('ProductsService', () => {
   });
 
   it('borra de verdad un producto sin historial', async () => {
-    prisma.product.findUnique.mockResolvedValue({
-      _count: { movements: 0, workOrderItems: 0 },
+    prisma.producto.findUnique.mockResolvedValue({
+      _count: { movimientos: 0, detallesOrden: 0 },
     });
     await service.remove('p1');
-    expect(prisma.product.delete).toHaveBeenCalledWith({
-      where: { productId: 'p1' },
+    expect(prisma.producto.delete).toHaveBeenCalledWith({
+      where: { productoId: 'p1' },
     });
   });
 
   it('responde 404 al borrar un producto que no existe', async () => {
-    prisma.product.findUnique.mockResolvedValue(null);
+    prisma.producto.findUnique.mockResolvedValue(null);
     await expect(service.remove('p1')).rejects.toThrow(NotFoundException);
   });
 });
@@ -189,52 +227,52 @@ describe('ProductsService', () => {
 describe('ProductsService.applyStockChange', () => {
   // La transacción del llamador: el método solo usa sus consultas de producto.
   const tx = {
-    product: { updateMany: vi.fn(), findUnique: vi.fn() },
+    producto: { updateMany: vi.fn(), findUnique: vi.fn() },
   };
   const service = new ProductsService({} as PrismaService);
   const apply = (change: StockChange) =>
     service.applyStockChange(tx as unknown as Prisma.TransactionClient, change);
   const product = (overrides: Record<string, unknown> = {}) => ({
-    productId: 'p1',
-    code: 'FA-001',
+    productoId: 'p1',
+    codigo: 'FA-001',
     stock: new Prisma.Decimal('3'),
-    cost: new Prisma.Decimal('12.5'),
-    isActive: true,
+    costo: new Prisma.Decimal('12.5'),
+    activo: true,
     ...overrides,
   });
 
   afterEach(() => vi.clearAllMocks());
 
   it('una compra suma al stock de forma atómica y actualiza el costo', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 1 });
-    tx.product.findUnique.mockResolvedValue(product());
+    tx.producto.updateMany.mockResolvedValue({ count: 1 });
+    tx.producto.findUnique.mockResolvedValue(product());
 
     await apply({
-      type: 'PURCHASE',
-      productId: 'p1',
-      quantity: '12',
-      unitCost: '13.80',
+      tipo: 'COMPRA',
+      productoId: 'p1',
+      cantidad: '12',
+      costoUnitario: '13.80',
     });
 
-    expect(tx.product.updateMany).toHaveBeenCalledWith({
-      where: { productId: 'p1', isActive: true },
+    expect(tx.producto.updateMany).toHaveBeenCalledWith({
+      where: { productoId: 'p1', activo: true },
       data: {
         stock: { increment: new Prisma.Decimal('12') },
-        cost: '13.80',
+        costo: '13.80',
       },
     });
   });
 
   it('un ajuste que resta solo se aplica si alcanza el stock, en la misma sentencia', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 1 });
-    tx.product.findUnique.mockResolvedValue(product());
+    tx.producto.updateMany.mockResolvedValue({ count: 1 });
+    tx.producto.findUnique.mockResolvedValue(product());
 
-    await apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '-2.5' });
+    await apply({ tipo: 'AJUSTE', productoId: 'p1', cantidad: '-2.5' });
 
-    expect(tx.product.updateMany).toHaveBeenCalledWith({
+    expect(tx.producto.updateMany).toHaveBeenCalledWith({
       where: {
-        productId: 'p1',
-        isActive: true,
+        productoId: 'p1',
+        activo: true,
         stock: { gte: new Prisma.Decimal('2.5') },
       },
       // Sin costo: solo la compra lo cambia.
@@ -244,48 +282,48 @@ describe('ProductsService.applyStockChange', () => {
 
   it('devuelve el producto actualizado, leído en la misma transacción', async () => {
     const updated = product({ stock: new Prisma.Decimal('15') });
-    tx.product.updateMany.mockResolvedValue({ count: 1 });
-    tx.product.findUnique.mockResolvedValue(updated);
+    tx.producto.updateMany.mockResolvedValue({ count: 1 });
+    tx.producto.findUnique.mockResolvedValue(updated);
 
     await expect(
-      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '12' }),
+      apply({ tipo: 'AJUSTE', productoId: 'p1', cantidad: '12' }),
     ).resolves.toBe(updated);
-    expect(tx.product.findUnique).toHaveBeenCalledWith({
-      where: { productId: 'p1' },
+    expect(tx.producto.findUnique).toHaveBeenCalledWith({
+      where: { productoId: 'p1' },
     });
   });
 
   it('si no alcanza, responde 409 con lo que queda y no deja el stock negativo', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 0 });
-    tx.product.findUnique.mockResolvedValue(product());
+    tx.producto.updateMany.mockResolvedValue({ count: 0 });
+    tx.producto.findUnique.mockResolvedValue(product());
 
     await expect(
-      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '-5' }),
+      apply({ tipo: 'AJUSTE', productoId: 'p1', cantidad: '-5' }),
     ).rejects.toThrow(
       new ConflictException('Stock insuficiente: quedan 3.00 de FA-001'),
     );
   });
 
   it('responde 404 si el producto no existe', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 0 });
-    tx.product.findUnique.mockResolvedValue(null);
+    tx.producto.updateMany.mockResolvedValue({ count: 0 });
+    tx.producto.findUnique.mockResolvedValue(null);
 
     await expect(
       apply({
-        type: 'PURCHASE',
-        productId: 'p1',
-        quantity: '1',
-        unitCost: '1',
+        tipo: 'COMPRA',
+        productoId: 'p1',
+        cantidad: '1',
+        costoUnitario: '1',
       }),
     ).rejects.toThrow(NotFoundException);
   });
 
   it('no registra compras ni ajustes de un producto inactivo', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 0 });
-    tx.product.findUnique.mockResolvedValue(product({ isActive: false }));
+    tx.producto.updateMany.mockResolvedValue({ count: 0 });
+    tx.producto.findUnique.mockResolvedValue(product({ activo: false }));
 
     await expect(
-      apply({ type: 'ADJUSTMENT', productId: 'p1', quantity: '1' }),
+      apply({ tipo: 'AJUSTE', productoId: 'p1', cantidad: '1' }),
     ).rejects.toThrow(
       new BadRequestException(
         'El producto está inactivo: actívalo antes de registrarle compras o ajustes',
@@ -294,25 +332,25 @@ describe('ProductsService.applyStockChange', () => {
   });
 
   it('el consumo en una orden no exige el producto activo', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 1 });
-    tx.product.findUnique.mockResolvedValue(product({ isActive: false }));
+    tx.producto.updateMany.mockResolvedValue({ count: 1 });
+    tx.producto.findUnique.mockResolvedValue(product({ activo: false }));
 
-    await apply({ type: 'WORK_ORDER', productId: 'p1', quantity: '-1' });
+    await apply({ tipo: 'ORDEN_TRABAJO', productoId: 'p1', cantidad: '-1' });
 
-    expect(tx.product.updateMany).toHaveBeenCalledWith({
-      where: { productId: 'p1', stock: { gte: new Prisma.Decimal('1') } },
+    expect(tx.producto.updateMany).toHaveBeenCalledWith({
+      where: { productoId: 'p1', stock: { gte: new Prisma.Decimal('1') } },
       data: { stock: { increment: new Prisma.Decimal('-1') } },
     });
   });
 
   it('un consumo sin stock suficiente también es 409, aunque el producto esté inactivo', async () => {
-    tx.product.updateMany.mockResolvedValue({ count: 0 });
-    tx.product.findUnique.mockResolvedValue(
-      product({ isActive: false, stock: new Prisma.Decimal('0') }),
+    tx.producto.updateMany.mockResolvedValue({ count: 0 });
+    tx.producto.findUnique.mockResolvedValue(
+      product({ activo: false, stock: new Prisma.Decimal('0') }),
     );
 
     await expect(
-      apply({ type: 'WORK_ORDER', productId: 'p1', quantity: '-1' }),
+      apply({ tipo: 'ORDEN_TRABAJO', productoId: 'p1', cantidad: '-1' }),
     ).rejects.toThrow('Stock insuficiente: quedan 0.00 de FA-001');
   });
 });

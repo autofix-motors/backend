@@ -8,136 +8,136 @@ import type { PrismaClient } from '../../src/generated/prisma/client.js';
 // volver a sembrar no pise el precio que el taller ya ajustó.
 
 interface SeedService {
-  name: string;
-  description: string;
-  laborPrice: string;
+  nombre: string;
+  descripcion: string;
+  precioManoObra: string;
 }
 
 const SERVICES: SeedService[] = [
   {
-    name: 'Cambio de aceite y filtro',
-    description:
+    nombre: 'Cambio de aceite y filtro',
+    descripcion:
       'Drenado, cambio de filtro de aceite y llenado. El aceite se cobra aparte.',
-    laborPrice: '35.00',
+    precioManoObra: '35.00',
   },
   {
-    name: 'Afinamiento menor',
-    description:
+    nombre: 'Afinamiento menor',
+    descripcion:
       'Cambio de bujías y filtros de aire y combustible, revisión de niveles.',
-    laborPrice: '120.00',
+    precioManoObra: '120.00',
   },
   {
-    name: 'Afinamiento mayor',
-    description:
+    nombre: 'Afinamiento mayor',
+    descripcion:
       'Afinamiento menor más limpieza de inyectores y del cuerpo de aceleración.',
-    laborPrice: '220.00',
+    precioManoObra: '220.00',
   },
   {
-    name: 'Diagnóstico con escáner',
-    description:
+    nombre: 'Diagnóstico con escáner',
+    descripcion:
       'Lectura y borrado de códigos de falla con escáner OBD2, con informe.',
-    laborPrice: '60.00',
+    precioManoObra: '60.00',
   },
   {
-    name: 'Cambio de pastillas de freno (por eje)',
-    description:
+    nombre: 'Cambio de pastillas de freno (por eje)',
+    descripcion:
       'Cambio de pastillas de un eje y revisión de discos y calipers.',
-    laborPrice: '80.00',
+    precioManoObra: '80.00',
   },
   {
-    name: 'Rectificado de discos de freno (par)',
-    description: 'Rectificado de los dos discos de un eje en torno.',
-    laborPrice: '90.00',
+    nombre: 'Rectificado de discos de freno (par)',
+    descripcion: 'Rectificado de los dos discos de un eje en torno.',
+    precioManoObra: '90.00',
   },
   {
-    name: 'Mantenimiento de frenos posteriores',
-    description: 'Limpieza, regulación o cambio de zapatas de tambor.',
-    laborPrice: '90.00',
+    nombre: 'Mantenimiento de frenos posteriores',
+    descripcion: 'Limpieza, regulación o cambio de zapatas de tambor.',
+    precioManoObra: '90.00',
   },
   {
-    name: 'Cambio de líquido de frenos',
-    description: 'Purga completa del sistema con líquido nuevo.',
-    laborPrice: '60.00',
+    nombre: 'Cambio de líquido de frenos',
+    descripcion: 'Purga completa del sistema con líquido nuevo.',
+    precioManoObra: '60.00',
   },
   {
-    name: 'Alineamiento',
-    description: 'Alineamiento computarizado de dirección.',
-    laborPrice: '60.00',
+    nombre: 'Alineamiento',
+    descripcion: 'Alineamiento computarizado de dirección.',
+    precioManoObra: '60.00',
   },
   {
-    name: 'Balanceo (4 ruedas)',
-    description: 'Balanceo de las cuatro ruedas con contrapesos.',
-    laborPrice: '40.00',
+    nombre: 'Balanceo (4 ruedas)',
+    descripcion: 'Balanceo de las cuatro ruedas con contrapesos.',
+    precioManoObra: '40.00',
   },
   {
-    name: 'Cambio de batería',
-    description: 'Cambio de batería y revisión del sistema de carga.',
-    laborPrice: '20.00',
+    nombre: 'Cambio de batería',
+    descripcion: 'Cambio de batería y revisión del sistema de carga.',
+    precioManoObra: '20.00',
   },
   {
-    name: 'Cambio de amortiguadores (par)',
-    description: 'Cambio de los dos amortiguadores de un eje.',
-    laborPrice: '120.00',
+    nombre: 'Cambio de amortiguadores (par)',
+    descripcion: 'Cambio de los dos amortiguadores de un eje.',
+    precioManoObra: '120.00',
   },
   {
-    name: 'Cambio de faja de distribución',
-    description: 'Cambio de faja o kit de distribución con su tensor.',
-    laborPrice: '250.00',
+    nombre: 'Cambio de faja de distribución',
+    descripcion: 'Cambio de faja o kit de distribución con su tensor.',
+    precioManoObra: '250.00',
   },
   {
-    name: 'Cambio de faja de accesorios',
-    description: 'Cambio de la faja del alternador, la bomba y el compresor.',
-    laborPrice: '60.00',
+    nombre: 'Cambio de faja de accesorios',
+    descripcion: 'Cambio de la faja del alternador, la bomba y el compresor.',
+    precioManoObra: '60.00',
   },
   {
-    name: 'Cambio de kit de embrague',
-    description: 'Desmontaje de caja, cambio de disco, prensa y collarín.',
-    laborPrice: '350.00',
+    nombre: 'Cambio de kit de embrague',
+    descripcion: 'Desmontaje de caja, cambio de disco, prensa y collarín.',
+    precioManoObra: '350.00',
   },
   {
-    name: 'Cambio de refrigerante',
-    description:
+    nombre: 'Cambio de refrigerante',
+    descripcion:
       'Purga del sistema de enfriamiento y llenado con refrigerante nuevo.',
-    laborPrice: '50.00',
+    precioManoObra: '50.00',
   },
   {
-    name: 'Limpieza de inyectores',
-    description:
+    nombre: 'Limpieza de inyectores',
+    descripcion:
       'Limpieza por ultrasonido y prueba de caudal de los inyectores.',
-    laborPrice: '150.00',
+    precioManoObra: '150.00',
   },
   {
-    name: 'Mantenimiento de aire acondicionado',
-    description: 'Revisión de fugas, vacío y carga de gas refrigerante.',
-    laborPrice: '150.00',
+    nombre: 'Mantenimiento de aire acondicionado',
+    descripcion: 'Revisión de fugas, vacío y carga de gas refrigerante.',
+    precioManoObra: '150.00',
   },
   {
-    name: 'Revisión de suspensión y dirección',
-    description: 'Inspección de rótulas, terminales, bujes y amortiguadores.',
-    laborPrice: '50.00',
+    nombre: 'Revisión de suspensión y dirección',
+    descripcion: 'Inspección de rótulas, terminales, bujes y amortiguadores.',
+    precioManoObra: '50.00',
   },
   {
-    name: 'Cambio de bujías',
-    description: 'Cambio del juego de bujías.',
-    laborPrice: '40.00',
+    nombre: 'Cambio de bujías',
+    descripcion: 'Cambio del juego de bujías.',
+    precioManoObra: '40.00',
   },
   {
-    name: 'Lavado de motor',
-    description: 'Lavado y desengrasado del compartimiento del motor.',
-    laborPrice: '40.00',
+    nombre: 'Lavado de motor',
+    descripcion: 'Lavado y desengrasado del compartimiento del motor.',
+    precioManoObra: '40.00',
   },
   {
-    name: 'Inspección previa a revisión técnica',
-    description:
+    nombre: 'Inspección previa a revisión técnica',
+    descripcion:
       'Chequeo de luces, frenos, emisiones y llantas antes de la revisión técnica.',
-    laborPrice: '50.00',
+    precioManoObra: '50.00',
   },
 ];
 
 export async function seedWorkshop(prisma: PrismaClient) {
   for (const service of SERVICES) {
-    await prisma.serviceCatalogItem.upsert({
-      where: { name: service.name },
+    await prisma.servicio.upsert({
+      where: { nombre: service.nombre },
       create: service,
       update: {},
     });

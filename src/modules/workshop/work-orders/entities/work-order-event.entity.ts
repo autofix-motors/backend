@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { WorkOrderEvent as WorkOrderEventModel } from '../../../../generated/prisma/client.js';
-import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
+import type { EventoOrden as WorkOrderEventModel } from '../../../../generated/prisma/client.js';
+import { EstadoOrden } from '../../../../generated/prisma/enums.js';
 import {
   WorkOrderUser,
   type WorkOrderUserModel,
@@ -8,44 +8,44 @@ import {
 
 export type WorkOrderEventWithAuthor = WorkOrderEventModel & {
   /** Vacío si lo hizo el cliente desde su portal. */
-  createdBy: WorkOrderUserModel | null;
+  creadoPor: WorkOrderUserModel | null;
 };
 
 /** Un evento de la línea de tiempo: un cambio de estado o una nota. */
 export class WorkOrderEvent {
   constructor(event: WorkOrderEventWithAuthor) {
-    this.workOrderEventId = event.workOrderEventId;
-    this.status = event.status;
-    this.note = event.note;
-    this.isPublic = event.isPublic;
-    this.createdBy = event.createdBy && new WorkOrderUser(event.createdBy);
-    this.createdAt = event.createdAt;
+    this.eventoOrdenId = event.eventoOrdenId;
+    this.estado = event.estado;
+    this.nota = event.nota;
+    this.esPublico = event.esPublico;
+    this.creadoPor = event.creadoPor && new WorkOrderUser(event.creadoPor);
+    this.creadoEn = event.creadoEn;
   }
 
   @ApiProperty({ format: 'uuid' })
-  workOrderEventId: string;
+  eventoOrdenId: string;
 
   @ApiProperty({
-    enum: WorkOrderStatus,
-    enumName: 'WorkOrderStatus',
+    enum: EstadoOrden,
+    enumName: 'EstadoOrden',
     nullable: true,
     description: 'El estado al que pasó; null si es solo una nota',
   })
-  status: WorkOrderStatus | null;
+  estado: EstadoOrden | null;
 
   @ApiProperty({ type: String, nullable: true })
-  note: string | null;
+  nota: string | null;
 
   @ApiProperty({ description: 'Si el cliente lo ve en el seguimiento' })
-  isPublic: boolean;
+  esPublico: boolean;
 
   @ApiProperty({
     type: WorkOrderUser,
     nullable: true,
     description: 'Vacío si lo hizo el cliente desde su portal',
   })
-  createdBy: WorkOrderUser | null;
+  creadoPor: WorkOrderUser | null;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 }

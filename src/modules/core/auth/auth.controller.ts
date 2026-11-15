@@ -39,6 +39,7 @@ import { AuthService, type SessionResult } from './auth.service.js';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { CurrentSession } from './entities/current-session.entity.js';
+import { Profile } from './entities/profile.entity.js';
 
 /**
  * Inicio y cierre de sesión del personal y de los clientes. Las credenciales
@@ -68,13 +69,13 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<BaseResponseDto<CurrentSession>> {
     const result = await this.auth.loginStaff(
-      dto.identifier,
-      dto.password,
+      dto.identificador,
+      dto.contrasena,
       sessionOrigin(request),
     );
     this.setCookies(response, result);
     return BaseResponseDto.success(
-      new CurrentSession(result.session),
+      new CurrentSession(result.sesion),
       'Sesión iniciada',
     );
   }
@@ -96,13 +97,13 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<BaseResponseDto<CurrentSession>> {
     const result = await this.auth.loginCustomer(
-      dto.identifier,
-      dto.password,
+      dto.identificador,
+      dto.contrasena,
       sessionOrigin(request),
     );
     this.setCookies(response, result);
     return BaseResponseDto.success(
-      new CurrentSession(result.session),
+      new CurrentSession(result.sesion),
       'Sesión iniciada',
     );
   }
@@ -126,7 +127,7 @@ export class AuthController {
       const result = await this.auth.refresh(token, sessionOrigin(request));
       this.setCookies(response, result);
       return BaseResponseDto.success(
-        new CurrentSession(result.session),
+        new CurrentSession(result.sesion),
         'Sesión renovada',
       );
     } catch (error) {
@@ -168,6 +169,26 @@ export class AuthController {
   }
 
   /**
+   * Los datos de quien tiene la sesión, personal o cliente, para «Mi perfil».
+   * Sin `@AllowPendingPasswordChange`: con la temporal pendiente solo se
+   * cambia la contraseña.
+   */
+  @AnySession()
+  @Get('profile')
+  @ApiBaseResponse(Profile)
+  @ApiUnauthorizedResponse({
+    description: 'Sin sesión, sesión expirada o acceso dado de baja',
+  })
+  async profile(
+    @CurrentPrincipal() principal: SessionPrincipal,
+  ): Promise<BaseResponseDto<Profile>> {
+    return BaseResponseDto.success(
+      new Profile(await this.auth.getProfile(principal)),
+      'Perfil obtenido',
+    );
+  }
+
+  /**
    * Cambiar la propia contraseña, del personal o de un cliente. Es lo único
    * que se puede hacer (además de ver la sesión) con la temporal sin cambiar.
    * Cierra las demás sesiones y deja cookies nuevas.
@@ -189,13 +210,13 @@ export class AuthController {
   ): Promise<BaseResponseDto<CurrentSession>> {
     const result = await this.auth.changeOwnPassword(
       principal,
-      dto.currentPassword,
-      dto.newPassword,
+      dto.contrasenaActual,
+      dto.contrasenaNueva,
       sessionOrigin(request),
     );
     this.setCookies(response, result);
     return BaseResponseDto.success(
-      new CurrentSession(result.session),
+      new CurrentSession(result.sesion),
       'Contraseña actualizada',
     );
   }
@@ -204,7 +225,7 @@ export class AuthController {
     const isProduction = this.isProduction();
     response.cookie(
       ACCESS_COOKIE,
-      result.accessToken,
+      result.tokenAcceso,
       accessCookieOptions(
         isProduction,
         this.config.getOrThrow<number>('ACCESS_TOKEN_MINUTES'),
@@ -212,7 +233,7 @@ export class AuthController {
     );
     response.cookie(
       REFRESH_COOKIE,
-      result.refreshToken,
+      result.tokenRefresco,
       refreshCookieOptions(
         isProduction,
         this.config.getOrThrow<number>('REFRESH_TOKEN_DAYS'),
@@ -243,6 +264,6 @@ function readRefreshToken(request: Request): string | undefined {
 function sessionOrigin(request: Request): SessionOrigin {
   return {
     ip: request.ip,
-    userAgent: request.get('user-agent')?.slice(0, 500),
+    agenteUsuario: request.get('user-agent')?.slice(0, 500),
   };
 }

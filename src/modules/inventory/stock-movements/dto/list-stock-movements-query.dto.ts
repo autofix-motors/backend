@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { IsDateOnly } from '../../../../core/validation/date-only.js';
-import { StockMovementType } from '../../../../generated/prisma/enums.js';
+import { TipoMovimiento } from '../../../../generated/prisma/enums.js';
 import { PaginationQueryDto } from '../../../../shared/dto/pagination-query.dto.js';
 
-export const STOCK_MOVEMENT_SORT_FIELDS = ['createdAt', 'quantity'] as const;
+export const STOCK_MOVEMENT_SORT_FIELDS = ['creadoEn', 'cantidad'] as const;
 export type StockMovementSortField =
   (typeof STOCK_MOVEMENT_SORT_FIELDS)[number];
 
@@ -15,19 +15,19 @@ export type StockMovementSortField =
  */
 export class ListStockMovementsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
-    enum: StockMovementType,
-    enumName: 'StockMovementType',
+    enum: TipoMovimiento,
+    enumName: 'TipoMovimiento',
   })
   @IsOptional()
-  @IsEnum(StockMovementType, {
-    message: 'El tipo es PURCHASE, WORK_ORDER o ADJUSTMENT',
+  @IsEnum(TipoMovimiento, {
+    message: 'El tipo es COMPRA, ORDEN_TRABAJO o AJUSTE',
   })
-  type?: StockMovementType;
+  tipo?: TipoMovimiento;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID('4', { message: 'El producto no es válido' })
-  productId?: string;
+  productoId?: string;
 
   @ApiPropertyOptional({
     example: '2026-10-01',
@@ -35,7 +35,7 @@ export class ListStockMovementsQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsDateOnly('La fecha desde')
-  from?: string;
+  desde?: string;
 
   @ApiPropertyOptional({
     example: '2026-10-31',
@@ -43,20 +43,20 @@ export class ListStockMovementsQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsDateOnly('La fecha hasta')
-  to?: string;
+  hasta?: string;
 
   @ApiPropertyOptional({
     enum: STOCK_MOVEMENT_SORT_FIELDS,
-    default: 'createdAt',
+    default: 'creadoEn',
   })
   @IsOptional()
   @IsIn(STOCK_MOVEMENT_SORT_FIELDS, {
-    message: 'Se ordena por createdAt o quantity',
+    message: 'Se ordena por creadoEn o cantidad',
   })
-  sortBy: StockMovementSortField = 'createdAt';
+  ordenarPor: StockMovementSortField = 'creadoEn';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()
-  @IsIn(['asc', 'desc'], { message: 'El orden es asc o desc' })
-  sortOrder: 'asc' | 'desc' = 'desc';
+  @IsIn(['asc', 'desc'], { message: 'El sentido es asc o desc' })
+  sentido: 'asc' | 'desc' = 'desc';
 }
