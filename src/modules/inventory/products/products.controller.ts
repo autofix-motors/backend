@@ -19,7 +19,7 @@ import type { SessionUser } from '../../../core/auth/session-user.js';
 import { CurrentUser } from '../../../core/decorators/current-user.decorator.js';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -31,12 +31,12 @@ import { UpdateProductDto } from './dto/update-product.dto.js';
 import { Product } from './entities/product.entity.js';
 import { ProductsService } from './products.service.js';
 
-// El costo y el margen salen solo para ADMIN. Las modificaciones son solo
-// suyas, así que su respuesta siempre los lleva.
+// El costo y el margen salen solo para ADMINISTRADOR. Las modificaciones son
+// solo suyas, así que su respuesta siempre los lleva.
 const costsFor = (user: SessionUser) => ({
-  includeCosts: user.role === UserRole.ADMIN,
+  incluirCostos: user.rol === RolUsuario.ADMINISTRADOR,
 });
-const WITH_COSTS = { includeCosts: true };
+const WITH_COSTS = { incluirCostos: true };
 
 /**
  * Los repuestos e insumos. Los consultan los dos roles —el mecánico revisa el
@@ -51,7 +51,7 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiPaginatedResponse(Product)
   async findAll(
     @Query() query: ListProductsQueryDto,
@@ -67,21 +67,21 @@ export class ProductsController {
   }
 
   @Get(':productId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(Product)
   @ApiNotFoundResponse({ description: 'No se encontró el producto' })
   async findOne(
-    @Param('productId', ParseIdPipe) productId: string,
+    @Param('productId', ParseIdPipe) productoId: string,
     @CurrentUser() user: SessionUser,
   ): Promise<BaseResponseDto<Product>> {
     return BaseResponseDto.success(
-      new Product(await this.products.findOne(productId), costsFor(user)),
+      new Product(await this.products.findOne(productoId), costsFor(user)),
       'Producto obtenido',
     );
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(Product, { status: HttpStatus.CREATED })
   @ApiConflictResponse({ description: 'Ya existe un producto con ese código' })
   async create(
@@ -95,22 +95,22 @@ export class ProductsController {
   }
 
   @Patch(':productId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(Product)
   @ApiNotFoundResponse({ description: 'No se encontró el producto' })
   @ApiConflictResponse({ description: 'Ya existe un producto con ese código' })
   async update(
-    @Param('productId', ParseIdPipe) productId: string,
+    @Param('productId', ParseIdPipe) productoId: string,
     @Body() dto: UpdateProductDto,
   ): Promise<BaseResponseDto<Product>> {
     return BaseResponseDto.success(
-      new Product(await this.products.update(productId, dto), WITH_COSTS),
+      new Product(await this.products.update(productoId, dto), WITH_COSTS),
       'Producto actualizado',
     );
   }
 
   @Delete(':productId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @HttpCode(HttpStatus.OK)
   @ApiBaseResponse(null, { description: 'Producto eliminado' })
   @ApiNotFoundResponse({ description: 'No se encontró el producto' })
@@ -118,9 +118,9 @@ export class ProductsController {
     description: 'El producto tiene movimientos de stock o ítems de órdenes',
   })
   async remove(
-    @Param('productId', ParseIdPipe) productId: string,
+    @Param('productId', ParseIdPipe) productoId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.products.remove(productId);
+    await this.products.remove(productoId);
     return BaseResponseDto.success(null, 'Producto eliminado');
   }
 }

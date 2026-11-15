@@ -2,13 +2,13 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { IsDateOnly } from '../../../../core/validation/date-only.js';
-import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
+import { EstadoOrden } from '../../../../generated/prisma/enums.js';
 import { PaginationQueryDto } from '../../../../shared/dto/pagination-query.dto.js';
 
 export const WORK_ORDER_SORT_FIELDS = [
-  'receivedAt',
-  'promisedDate',
-  'number',
+  'recibidaEn',
+  'fechaPrometida',
+  'numero',
 ] as const;
 export type WorkOrderSortField = (typeof WORK_ORDER_SORT_FIELDS)[number];
 
@@ -18,13 +18,13 @@ export type WorkOrderSortField = (typeof WORK_ORDER_SORT_FIELDS)[number];
  * varios), el mecánico, el vehículo, el cliente, las vencidas y un rango de
  * días de ingreso. Por defecto, lo último que entró primero.
  *
- * El mecánico solo ve sus órdenes: el service ignora el `mechanicId` que pida
+ * El mecánico solo ve sus órdenes: el service ignora el `mecanicoId` que pida
  * y usa el de su sesión.
  */
 export class ListWorkOrdersQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     type: String,
-    example: 'RECEIVED,DIAGNOSIS',
+    example: 'RECIBIDO,EN_DIAGNOSTICO',
     description: 'Uno o varios estados, separados por coma',
   })
   @IsOptional()
@@ -34,33 +34,33 @@ export class ListWorkOrdersQueryDto extends PaginationQueryDto {
     if (typeof value !== 'string') return value;
     const statuses = value
       .split(',')
-      .map((status) => status.trim())
+      .map((estado) => estado.trim())
       .filter(Boolean);
     return statuses.length ? statuses : undefined;
   })
-  @IsEnum(WorkOrderStatus, {
+  @IsEnum(EstadoOrden, {
     each: true,
     message: 'El estado no es válido',
   })
-  status?: WorkOrderStatus[];
+  estado?: EstadoOrden[];
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'Solo para ADMIN: el mecánico ve siempre las suyas',
+    description: 'Solo para ADMINISTRADOR: el mecánico ve siempre las suyas',
   })
   @IsOptional()
   @IsUUID('4', { message: 'El mecánico no es válido' })
-  mechanicId?: string;
+  mecanicoId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID('4', { message: 'El vehículo no es válido' })
-  vehicleId?: string;
+  vehiculoId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID('4', { message: 'El cliente no es válido' })
-  customerId?: string;
+  clienteId?: string;
 
   @ApiPropertyOptional({
     type: Boolean,
@@ -72,7 +72,7 @@ export class ListWorkOrdersQueryDto extends PaginationQueryDto {
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean({ message: 'El filtro de vencidas es true o false' })
-  overdue?: boolean;
+  vencidas?: boolean;
 
   @ApiPropertyOptional({
     example: '2026-10-01',
@@ -80,7 +80,7 @@ export class ListWorkOrdersQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsDateOnly('La fecha desde')
-  from?: string;
+  desde?: string;
 
   @ApiPropertyOptional({
     example: '2026-10-31',
@@ -89,17 +89,17 @@ export class ListWorkOrdersQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsDateOnly('La fecha hasta')
-  to?: string;
+  hasta?: string;
 
-  @ApiPropertyOptional({ enum: WORK_ORDER_SORT_FIELDS, default: 'receivedAt' })
+  @ApiPropertyOptional({ enum: WORK_ORDER_SORT_FIELDS, default: 'recibidaEn' })
   @IsOptional()
   @IsIn(WORK_ORDER_SORT_FIELDS, {
-    message: 'Se ordena por receivedAt, promisedDate o number',
+    message: 'Se ordena por recibidaEn, fechaPrometida o numero',
   })
-  sortBy: WorkOrderSortField = 'receivedAt';
+  ordenarPor: WorkOrderSortField = 'recibidaEn';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()
   @IsIn(['asc', 'desc'], { message: 'El orden es asc o desc' })
-  sortOrder: 'asc' | 'desc' = 'desc';
+  sentido: 'asc' | 'desc' = 'desc';
 }

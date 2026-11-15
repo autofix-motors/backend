@@ -6,23 +6,23 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class PortalCredentials {
   constructor(credentials: PortalCredentials) {
-    this.loginIdentifier = credentials.loginIdentifier;
-    this.temporaryPassword = credentials.temporaryPassword;
-    this.expiresAt = credentials.expiresAt;
+    this.identificadorAcceso = credentials.identificadorAcceso;
+    this.contrasenaTemporal = credentials.contrasenaTemporal;
+    this.expiraEn = credentials.expiraEn;
   }
 
   @ApiProperty({
     example: '45678912',
     description: 'El número de documento del cliente: con él inicia sesión',
   })
-  loginIdentifier: string;
+  identificadorAcceso: string;
 
   @ApiProperty({ example: 'Hk7mQ4pZr2Tx' })
-  temporaryPassword: string;
+  contrasenaTemporal: string;
 
   @ApiProperty({
     format: 'date-time',
     description: 'Después de esto ya no sirve: hay que generar otra',
   })
-  expiresAt: Date;
+  expiraEn: Date;
 }

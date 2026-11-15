@@ -5,14 +5,14 @@ import { User, type UserWithCounts } from './user.entity.js';
 /** El usuario recién registrado, con la contraseña temporal para compartirle. */
 export class IssuedUser extends TemporaryPassword {
   constructor(issued: {
-    user: UserWithCounts;
-    temporaryPassword: string;
-    expiresAt: Date;
+    usuario: UserWithCounts;
+    contrasenaTemporal: string;
+    expiraEn: Date;
   }) {
     super(issued);
-    this.user = new User(issued.user);
+    this.usuario = new User(issued.usuario);
   }
 
   @ApiProperty({ type: User })
-  user: User;
+  usuario: User;
 }

@@ -16,8 +16,8 @@ import type {
 export const CurrentCustomer = createParamDecorator(
   (_data: unknown, context: ExecutionContext): SessionCustomer => {
     const request = context.switchToHttp().getRequest<RequestWithSession>();
-    if (request.customer) return request.customer;
-    if (request.user) {
+    if (request.cliente) return request.cliente;
+    if (request.usuario) {
       throw new ForbiddenException('No tienes permiso para esta acción');
     }
     throw new UnauthorizedException('Inicia sesión para continuar');

@@ -28,12 +28,12 @@ async function check<T extends object>(
 describe('ChangeWorkOrderStatusDto', () => {
   it('acepta el estado solo; la nota vacía queda en null', async () => {
     const { dto, messages } = await check(ChangeWorkOrderStatusDto, {
-      status: 'IN_PROGRESS',
-      note: '   ',
+      estado: 'EN_REPARACION',
+      nota: '   ',
     });
     expect(messages).toEqual([]);
-    expect(dto.note).toBeNull();
-    expect(dto.isPublic).toBeUndefined();
+    expect(dto.nota).toBeNull();
+    expect(dto.esPublico).toBeUndefined();
   });
 
   it('pide un estado que exista', async () => {
@@ -41,17 +41,17 @@ describe('ChangeWorkOrderStatusDto', () => {
       'El estado no es válido',
     ]);
     expect(
-      (await check(ChangeWorkOrderStatusDto, { status: 'FINISHED' })).messages,
+      (await check(ChangeWorkOrderStatusDto, { estado: 'FINISHED' })).messages,
     ).toEqual(['El estado no es válido']);
   });
 
-  it('isPublic es opcional pero no anulable', async () => {
+  it('esPublico es opcional pero no anulable', async () => {
     expect(
       (
         await check(ChangeWorkOrderStatusDto, {
-          status: 'READY',
-          isPublic: null,
-          note: 'x'.repeat(2001),
+          estado: 'LISTO',
+          esPublico: null,
+          nota: 'x'.repeat(2001),
         })
       ).messages,
     ).toEqual([

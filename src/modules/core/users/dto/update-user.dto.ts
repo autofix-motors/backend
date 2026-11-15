@@ -3,7 +3,7 @@ import { IsBoolean, ValidateIf } from 'class-validator';
 import { CreateUserDto } from './create-user.dto.js';
 
 // La contraseña no se edita aquí: se restablece con su propio endpoint
-// (POST /users/:userId/temporary-password), que además cierra las sesiones del
+// (POST /users/:usuarioId/temporary-password), que además cierra las sesiones del
 // usuario. Igual que en clientes, un null en un campo obligatorio se valida y
 // responde 400 en vez de llegar a la base como un 500.
 export class UpdateUserDto extends PartialType(CreateUserDto, {
@@ -13,5 +13,5 @@ export class UpdateUserDto extends PartialType(CreateUserDto, {
   // No es `@IsOptional()`: ese dejaría pasar un null, y la columna no lo admite.
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean({ message: 'El estado tiene que ser verdadero o falso' })
-  isActive?: boolean;
+  activo?: boolean;
 }

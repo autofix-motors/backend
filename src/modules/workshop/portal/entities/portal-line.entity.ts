@@ -1,15 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type { Prisma } from '../../../../generated/prisma/client.js';
-import { ItemType, UnitOfMeasure } from '../../../../generated/prisma/enums.js';
+import {
+  TipoDetalle,
+  UnidadMedida,
+} from '../../../../generated/prisma/enums.js';
 import { itemSubtotal } from '../../work-orders/work-order-totals.js';
 
-/** Lo que el portal necesita de un ítem de la orden o del presupuesto. */
+/** Lo que el portal necesita de un detalle de la orden o del presupuesto. */
 export interface PortalLineModel {
-  type: ItemType;
-  description: string;
-  quantity: Prisma.Decimal;
-  unitPrice: Prisma.Decimal;
-  product?: { unit: UnitOfMeasure } | null;
+  tipo: TipoDetalle;
+  descripcion: string;
+  cantidad: Prisma.Decimal;
+  precioUnitario: Prisma.Decimal;
+  producto?: { unidad: UnidadMedida } | null;
 }
 
 /**
@@ -18,33 +21,33 @@ export interface PortalLineModel {
  */
 export class PortalLine {
   constructor(line: PortalLineModel) {
-    this.type = line.type;
-    this.description = line.description;
-    this.quantity = line.quantity.toFixed(2);
-    this.unit = line.product?.unit ?? null;
-    this.unitPrice = line.unitPrice.toFixed(2);
+    this.tipo = line.tipo;
+    this.descripcion = line.descripcion;
+    this.cantidad = line.cantidad.toFixed(2);
+    this.unidad = line.producto?.unidad ?? null;
+    this.precioUnitario = line.precioUnitario.toFixed(2);
     this.subtotal = itemSubtotal(line).toFixed(2);
   }
 
-  @ApiProperty({ enum: ItemType, enumName: 'ItemType' })
-  type: ItemType;
+  @ApiProperty({ enum: TipoDetalle, enumName: 'TipoDetalle' })
+  tipo: TipoDetalle;
 
   @ApiProperty({ example: 'Cambio de aceite y filtro' })
-  description: string;
+  descripcion: string;
 
   @ApiProperty({ example: '1.00' })
-  quantity: string;
+  cantidad: string;
 
   @ApiProperty({
-    enum: UnitOfMeasure,
-    enumName: 'UnitOfMeasure',
+    enum: UnidadMedida,
+    enumName: 'UnidadMedida',
     nullable: true,
     description: 'Solo en repuestos',
   })
-  unit: UnitOfMeasure | null;
+  unidad: UnidadMedida | null;
 
   @ApiProperty({ example: '35.00' })
-  unitPrice: string;
+  precioUnitario: string;
 
   @ApiProperty({ example: '35.00' })
   subtotal: string;

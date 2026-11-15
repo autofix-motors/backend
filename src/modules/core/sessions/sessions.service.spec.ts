@@ -13,26 +13,26 @@ const EXPIRED = new UnauthorizedException(
 
 function session(overrides: Record<string, unknown> = {}) {
   return {
-    sessionId: 's1',
-    userId: 'u1',
-    familyId: 'f1',
-    tokenHash: hashToken('token'),
-    expiresAt: new Date(Date.now() + 60_000),
-    revokedAt: null,
+    sesionId: 's1',
+    usuarioId: 'u1',
+    familiaId: 'f1',
+    hashToken: hashToken('token'),
+    expiraEn: new Date(Date.now() + 60_000),
+    revocadaEn: null,
     ...overrides,
   };
 }
 
 describe('SessionsService.rotate', () => {
   const tx = {
-    session: {
+    sesion: {
       updateMany: vi.fn(),
-      create: vi.fn().mockResolvedValue({ sessionId: 's2' }),
+      create: vi.fn().mockResolvedValue({ sesionId: 's2' }),
       update: vi.fn(),
     },
   };
   const prisma = {
-    session: { findUnique: vi.fn(), updateMany: vi.fn() },
+    sesion: { findUnique: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
   const config = { getOrThrow: vi.fn().mockReturnValue(7) };
@@ -44,80 +44,80 @@ describe('SessionsService.rotate', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('rechaza un token que no existe', async () => {
-    prisma.session.findUnique.mockResolvedValue(null);
+    prisma.sesion.findUnique.mockResolvedValue(null);
     await expect(service.rotate('token', {})).rejects.toThrow(EXPIRED);
   });
 
   it('ante un token ya revocado, revoca la familia entera', async () => {
-    prisma.session.findUnique.mockResolvedValue(
-      session({ revokedAt: new Date() }),
+    prisma.sesion.findUnique.mockResolvedValue(
+      session({ revocadaEn: new Date() }),
     );
     await expect(service.rotate('token', {})).rejects.toThrow(EXPIRED);
-    expect(prisma.session.updateMany).toHaveBeenCalledWith({
-      where: { familyId: 'f1', revokedAt: null },
-      data: { revokedAt: expect.any(Date) },
+    expect(prisma.sesion.updateMany).toHaveBeenCalledWith({
+      where: { familiaId: 'f1', revocadaEn: null },
+      data: { revocadaEn: expect.any(Date) },
     });
   });
 
   it('rechaza una sesión vencida', async () => {
-    prisma.session.findUnique.mockResolvedValue(
-      session({ expiresAt: new Date(Date.now() - 1000) }),
+    prisma.sesion.findUnique.mockResolvedValue(
+      session({ expiraEn: new Date(Date.now() - 1000) }),
     );
     await expect(service.rotate('token', {})).rejects.toThrow(EXPIRED);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('rota: revoca la usada, crea otra en la misma familia y las enlaza', async () => {
-    prisma.session.findUnique.mockResolvedValue(session());
-    tx.session.updateMany.mockResolvedValue({ count: 1 });
+    prisma.sesion.findUnique.mockResolvedValue(session());
+    tx.sesion.updateMany.mockResolvedValue({ count: 1 });
 
     const rotated = await service.rotate('token', {});
 
-    expect(rotated.owner).toEqual({ userId: 'u1' });
-    expect(rotated.familyId).toBe('f1');
+    expect(rotated.dueno).toEqual({ usuarioId: 'u1' });
+    expect(rotated.familiaId).toBe('f1');
     expect(rotated.token).not.toBe('token');
-    expect(tx.session.create).toHaveBeenCalledWith({
+    expect(tx.sesion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        userId: 'u1',
-        customerAccountId: null,
-        familyId: 'f1',
-        tokenHash: hashToken(rotated.token),
+        usuarioId: 'u1',
+        cuentaClienteId: null,
+        familiaId: 'f1',
+        hashToken: hashToken(rotated.token),
       }),
     });
-    expect(tx.session.update).toHaveBeenCalledWith({
-      where: { sessionId: 's1' },
-      data: { replacedById: 's2' },
+    expect(tx.sesion.update).toHaveBeenCalledWith({
+      where: { sesionId: 's1' },
+      data: { reemplazadaPorId: 's2' },
     });
   });
 
   it('rota la sesión de un cliente con su misma cuenta', async () => {
-    prisma.session.findUnique.mockResolvedValue(
-      session({ userId: null, customerAccountId: 'ca1' }),
+    prisma.sesion.findUnique.mockResolvedValue(
+      session({ usuarioId: null, cuentaClienteId: 'ca1' }),
     );
-    tx.session.updateMany.mockResolvedValue({ count: 1 });
+    tx.sesion.updateMany.mockResolvedValue({ count: 1 });
 
     const rotated = await service.rotate('token', {});
 
-    expect(rotated.owner).toEqual({ customerAccountId: 'ca1' });
-    expect(tx.session.create).toHaveBeenCalledWith({
+    expect(rotated.dueno).toEqual({ cuentaClienteId: 'ca1' });
+    expect(tx.sesion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        userId: null,
-        customerAccountId: 'ca1',
+        usuarioId: null,
+        cuentaClienteId: 'ca1',
       }),
     });
   });
 
   it('si otro refresco ganó la carrera con el mismo token, rechaza el segundo', async () => {
-    prisma.session.findUnique.mockResolvedValue(session());
-    tx.session.updateMany.mockResolvedValue({ count: 0 });
+    prisma.sesion.findUnique.mockResolvedValue(session());
+    tx.sesion.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(service.rotate('token', {})).rejects.toThrow(EXPIRED);
-    expect(tx.session.create).not.toHaveBeenCalled();
+    expect(tx.sesion.create).not.toHaveBeenCalled();
   });
 });
 
 describe('SessionsService.revokeAll', () => {
-  const prisma = { session: { updateMany: vi.fn() } };
+  const prisma = { sesion: { updateMany: vi.fn() } };
   const service = new SessionsService(
     prisma as unknown as PrismaService,
     {} as ConfigService,
@@ -126,26 +126,26 @@ describe('SessionsService.revokeAll', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('revoca solo las sesiones vigentes de ese usuario', async () => {
-    await service.revokeAll({ userId: 'u1' });
-    expect(prisma.session.updateMany).toHaveBeenCalledWith({
-      where: { userId: 'u1', customerAccountId: null, revokedAt: null },
-      data: { revokedAt: expect.any(Date) },
+    await service.revokeAll({ usuarioId: 'u1' });
+    expect(prisma.sesion.updateMany).toHaveBeenCalledWith({
+      where: { usuarioId: 'u1', cuentaClienteId: null, revocadaEn: null },
+      data: { revocadaEn: expect.any(Date) },
     });
   });
 
   it('revoca solo las sesiones vigentes de esa cuenta de cliente', async () => {
-    await service.revokeAll({ customerAccountId: 'ca1' });
-    expect(prisma.session.updateMany).toHaveBeenCalledWith({
-      where: { userId: null, customerAccountId: 'ca1', revokedAt: null },
-      data: { revokedAt: expect.any(Date) },
+    await service.revokeAll({ cuentaClienteId: 'ca1' });
+    expect(prisma.sesion.updateMany).toHaveBeenCalledWith({
+      where: { usuarioId: null, cuentaClienteId: 'ca1', revocadaEn: null },
+      data: { revocadaEn: expect.any(Date) },
     });
   });
 
-  it('revoca las del portal de un cliente por su customerId', async () => {
+  it('revoca las del portal de un cliente por su clienteId', async () => {
     await service.revokeAllForCustomer('c1');
-    expect(prisma.session.updateMany).toHaveBeenCalledWith({
-      where: { customerAccount: { customerId: 'c1' }, revokedAt: null },
-      data: { revokedAt: expect.any(Date) },
+    expect(prisma.sesion.updateMany).toHaveBeenCalledWith({
+      where: { cuentaCliente: { clienteId: 'c1' }, revocadaEn: null },
+      data: { revocadaEn: expect.any(Date) },
     });
   });
 });

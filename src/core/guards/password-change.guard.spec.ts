@@ -16,14 +16,14 @@ describe('PasswordChangeGuard', () => {
       .spyOn(reflector, 'getAllAndOverride')
       .mockImplementation((key: unknown) => metadata[key as string]);
   const pending = () =>
-    testContext({ customer: { customerId: 'c1' }, mustChangePassword: true });
+    testContext({ cliente: { clienteId: 'c1' }, debeCambiarContrasena: true });
 
   afterEach(() => vi.restoreAllMocks());
 
   it('deja pasar a quien ya cambió su contraseña', () => {
     endpoint({});
     expect(
-      guard.canActivate(testContext({ user: { userId: 'u1' } })),
+      guard.canActivate(testContext({ usuario: { usuarioId: 'u1' } })),
     ).toBe(true);
   });
 

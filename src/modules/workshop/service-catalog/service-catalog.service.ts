@@ -5,10 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
-import {
-  Prisma,
-  type ServiceCatalogItem,
-} from '../../../generated/prisma/client.js';
+import { Prisma, type Servicio } from '../../../generated/prisma/client.js';
 import {
   pageWindow,
   paginationMeta,
@@ -26,53 +23,48 @@ const INVERTED_RANGE = 'El precio mínimo no puede ser mayor que el máximo';
 export class ServiceCatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(
-    query: ListServiceCatalogQueryDto,
-  ): Promise<Page<ServiceCatalogItem>> {
+  async findAll(query: ListServiceCatalogQueryDto): Promise<Page<Servicio>> {
     const where = serviceCatalogWhere(query);
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.serviceCatalogItem.findMany({
+      this.prisma.servicio.findMany({
         where,
         // El desempate por id hace que la paginación sea estable: con varios
         // servicios del mismo precio, el orden no cambia entre páginas.
-        orderBy: [
-          { [query.sortBy]: query.sortOrder },
-          { serviceCatalogItemId: 'asc' },
-        ],
+        orderBy: [{ [query.ordenarPor]: query.sentido }, { servicioId: 'asc' }],
         ...pageWindow(query.page, query.pageSize),
       }),
-      this.prisma.serviceCatalogItem.count({ where }),
+      this.prisma.servicio.count({ where }),
     ]);
     return { items, meta: paginationMeta(query.page, query.pageSize, total) };
   }
 
-  async findOne(serviceCatalogItemId: string): Promise<ServiceCatalogItem> {
-    const item = await this.prisma.serviceCatalogItem.findUnique({
-      where: { serviceCatalogItemId },
+  async findOne(servicioId: string): Promise<Servicio> {
+    const item = await this.prisma.servicio.findUnique({
+      where: { servicioId },
     });
     if (!item) throw new NotFoundException(NOT_FOUND);
     return item;
   }
 
-  async create(data: CreateServiceCatalogItemDto): Promise<ServiceCatalogItem> {
-    await this.assertNameIsFree(data.name);
+  async create(data: CreateServiceCatalogItemDto): Promise<Servicio> {
+    await this.assertNameIsFree(data.nombre);
     try {
-      return await this.prisma.serviceCatalogItem.create({ data });
+      return await this.prisma.servicio.create({ data });
     } catch (error) {
       throw translateDuplicate(error);
     }
   }
 
   async update(
-    serviceCatalogItemId: string,
+    servicioId: string,
     data: UpdateServiceCatalogItemDto,
-  ): Promise<ServiceCatalogItem> {
-    await this.findOne(serviceCatalogItemId);
-    if (data.name) await this.assertNameIsFree(data.name, serviceCatalogItemId);
+  ): Promise<Servicio> {
+    await this.findOne(servicioId);
+    if (data.nombre) await this.assertNameIsFree(data.nombre, servicioId);
 
     try {
-      return await this.prisma.serviceCatalogItem.update({
-        where: { serviceCatalogItemId },
+      return await this.prisma.servicio.update({
+        where: { servicioId },
         data,
       });
     } catch (error) {
@@ -85,21 +77,21 @@ export class ServiceCatalogService {
    * permite (RESTRICT); se comprueba antes para decir por qué, en vez del
    * mensaje genérico de la clave foránea.
    */
-  async remove(serviceCatalogItemId: string): Promise<void> {
-    const item = await this.prisma.serviceCatalogItem.findUnique({
-      where: { serviceCatalogItemId },
-      select: { _count: { select: { workOrderItems: true } } },
+  async remove(servicioId: string): Promise<void> {
+    const item = await this.prisma.servicio.findUnique({
+      where: { servicioId },
+      select: { _count: { select: { detallesOrden: true } } },
     });
     if (!item) throw new NotFoundException(NOT_FOUND);
 
-    const { workOrderItems } = item._count;
-    if (workOrderItems) {
+    const { detallesOrden } = item._count;
+    if (detallesOrden) {
       throw new ConflictException(
-        `No se puede eliminar: el servicio ya se usó en ${workOrderItems} ${workOrderItems === 1 ? 'ítem' : 'ítems'} de órdenes de trabajo. Puedes desactivarlo para que deje de ofrecerse`,
+        `No se puede eliminar: el servicio ya se usó en ${detallesOrden} ${detallesOrden === 1 ? 'detalle' : 'detalles'} de órdenes de trabajo. Puedes desactivarlo para que deje de ofrecerse`,
       );
     }
-    await this.prisma.serviceCatalogItem.delete({
-      where: { serviceCatalogItemId },
+    await this.prisma.servicio.delete({
+      where: { servicioId },
     });
   }
 
@@ -110,17 +102,17 @@ export class ServiceCatalogService {
    * respaldo si dos altas coinciden.
    */
   private async assertNameIsFree(
-    name: string,
-    exceptServiceCatalogItemId?: string,
+    nombre: string,
+    exceptServicioId?: string,
   ): Promise<void> {
-    const existing = await this.prisma.serviceCatalogItem.findFirst({
+    const existing = await this.prisma.servicio.findFirst({
       where: {
-        name: { equals: name, mode: 'insensitive' },
-        ...(exceptServiceCatalogItemId && {
-          NOT: { serviceCatalogItemId: exceptServiceCatalogItemId },
+        nombre: { equals: nombre, mode: 'insensitive' },
+        ...(exceptServicioId && {
+          NOT: { servicioId: exceptServicioId },
         }),
       },
-      select: { serviceCatalogItemId: true },
+      select: { servicioId: true },
     });
     if (existing) throw new ConflictException(DUPLICATE);
   }
@@ -129,22 +121,26 @@ export class ServiceCatalogService {
 export function serviceCatalogWhere(
   query: Pick<
     ListServiceCatalogQueryDto,
-    'search' | 'isActive' | 'minPrice' | 'maxPrice'
+    'search' | 'activo' | 'precioMinimo' | 'precioMaximo'
   >,
-): Prisma.ServiceCatalogItemWhereInput {
-  const { minPrice, maxPrice } = query;
-  if (minPrice && maxPrice && new Prisma.Decimal(minPrice).gt(maxPrice)) {
+): Prisma.ServicioWhereInput {
+  const { precioMinimo, precioMaximo } = query;
+  if (
+    precioMinimo &&
+    precioMaximo &&
+    new Prisma.Decimal(precioMinimo).gt(precioMaximo)
+  ) {
     throw new BadRequestException(INVERTED_RANGE);
   }
 
   const text = { contains: query.search, mode: 'insensitive' } as const;
   return {
-    isActive: query.isActive,
-    ...((minPrice || maxPrice) && {
-      laborPrice: { gte: minPrice, lte: maxPrice },
+    activo: query.activo,
+    ...((precioMinimo || precioMaximo) && {
+      precioManoObra: { gte: precioMinimo, lte: precioMaximo },
     }),
     ...(query.search && {
-      OR: [{ name: text }, { description: text }],
+      OR: [{ nombre: text }, { descripcion: text }],
     }),
   };
 }

@@ -14,51 +14,54 @@ import {
 
 // Lo que se prueba es lo que decide: desde qué estados se envía y se decide,
 // la versión que sigue y la pendiente que queda reemplazada, la foto de los
-// ítems (sin costo, sin apuntar al ítem vivo, en su orden), el total con
+// detalles (sin costo, sin apuntar al detalle vivo, en su orden), el total con
 // Decimal, lo que queda en la línea de tiempo, que la decisión solo valga
 // sobre la versión pendiente, y que un cambio simultáneo no se pise.
 
-const ADMIN: SessionUser = { userId: 'admin-1', role: 'ADMIN' };
+const ADMINISTRADOR: SessionUser = {
+  usuarioId: 'admin-1',
+  rol: 'ADMINISTRADOR',
+};
 
 const D = (value: string) => new Prisma.Decimal(value);
 const SENT_AT = new Date('2026-10-04T15:00:00.000Z');
 
 const service1 = {
-  workOrderItemId: 'item-1',
-  workOrderId: 'wo-1',
-  type: 'SERVICE' as const,
-  serviceCatalogItemId: 'svc-1',
-  productId: null,
-  description: 'Cambio de aceite y filtro',
-  quantity: D('1'),
-  unitPrice: D('60'),
-  unitCost: null,
+  detalleOrdenId: 'item-1',
+  ordenTrabajoId: 'wo-1',
+  tipo: 'SERVICIO' as const,
+  servicioId: 'svc-1',
+  productoId: null,
+  descripcion: 'Cambio de aceite y filtro',
+  cantidad: D('1'),
+  precioUnitario: D('60'),
+  costoUnitario: null,
 };
 const part1 = {
-  workOrderItemId: 'item-2',
-  workOrderId: 'wo-1',
-  type: 'PRODUCT' as const,
-  serviceCatalogItemId: null,
-  productId: 'prod-1',
-  description: 'ACE-1030-LT · Aceite de motor 10W-30 (litro)',
-  quantity: D('1.25'),
-  unitPrice: D('38.90'),
-  unitCost: D('22.00'),
+  detalleOrdenId: 'item-2',
+  ordenTrabajoId: 'wo-1',
+  tipo: 'PRODUCTO' as const,
+  servicioId: null,
+  productoId: 'prod-1',
+  descripcion: 'ACE-1030-LT · Aceite de motor 10W-30 (litro)',
+  cantidad: D('1.25'),
+  precioUnitario: D('38.90'),
+  costoUnitario: D('22.00'),
 };
 
-const quote = (overrides: Record<string, unknown> = {}) => ({
-  quoteId: 'q-2',
-  workOrderId: 'wo-1',
+const presupuesto = (overrides: Record<string, unknown> = {}) => ({
+  presupuestoId: 'q-2',
+  ordenTrabajoId: 'wo-1',
   version: 2,
-  status: 'PENDING',
+  estado: 'PENDIENTE',
   ...overrides,
 });
 
 describe('WorkOrderQuotesService', () => {
   const tx = {
-    workOrder: { update: vi.fn() },
-    workOrderItem: { findMany: vi.fn() },
-    quote: {
+    ordenTrabajo: { update: vi.fn() },
+    detalleOrden: { findMany: vi.fn() },
+    presupuesto: {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
       create: vi.fn(),
@@ -74,12 +77,12 @@ describe('WorkOrderQuotesService', () => {
   );
 
   const order = (overrides: Record<string, unknown> = {}) => ({
-    workOrderId: 'wo-1',
-    number: 123,
-    status: 'DIAGNOSIS',
-    mechanicId: 'mech-1',
-    items: [service1, part1],
-    quotes: [],
+    ordenTrabajoId: 'wo-1',
+    numero: 123,
+    estado: 'EN_DIAGNOSTICO',
+    mecanicoId: 'mech-1',
+    detalles: [service1, part1],
+    presupuestos: [],
     ...overrides,
   });
   const knownError = (code: string) =>
@@ -92,11 +95,11 @@ describe('WorkOrderQuotesService', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(SENT_AT);
     workOrders.findOne.mockResolvedValue(order());
-    tx.workOrderItem.findMany.mockResolvedValue([service1, part1]);
-    tx.quote.findFirst.mockResolvedValue({ version: 2 });
-    tx.quote.updateMany.mockResolvedValue({ count: 1 });
-    tx.quote.create.mockResolvedValue({});
-    tx.workOrder.update.mockResolvedValue(order());
+    tx.detalleOrden.findMany.mockResolvedValue([service1, part1]);
+    tx.presupuesto.findFirst.mockResolvedValue({ version: 2 });
+    tx.presupuesto.updateMany.mockResolvedValue({ count: 1 });
+    tx.presupuesto.create.mockResolvedValue({});
+    tx.ordenTrabajo.update.mockResolvedValue(order());
   });
 
   afterEach(() => {
@@ -106,93 +109,93 @@ describe('WorkOrderQuotesService', () => {
 
   describe('send', () => {
     it('la versión sigue a la última y la pendiente anterior queda reemplazada', async () => {
-      await service.send('wo-1', {}, ADMIN);
-      expect(tx.quote.findFirst).toHaveBeenCalledWith({
-        where: { workOrderId: 'wo-1' },
+      await service.send('wo-1', {}, ADMINISTRADOR);
+      expect(tx.presupuesto.findFirst).toHaveBeenCalledWith({
+        where: { ordenTrabajoId: 'wo-1' },
         orderBy: { version: 'desc' },
         select: { version: true },
       });
-      expect(tx.quote.updateMany).toHaveBeenCalledWith({
-        where: { workOrderId: 'wo-1', status: 'PENDING' },
-        data: { status: 'SUPERSEDED' },
+      expect(tx.presupuesto.updateMany).toHaveBeenCalledWith({
+        where: { ordenTrabajoId: 'wo-1', estado: 'PENDIENTE' },
+        data: { estado: 'REEMPLAZADO' },
       });
-      expect(tx.quote.create.mock.calls[0][0].data).toMatchObject({
-        workOrderId: 'wo-1',
+      expect(tx.presupuesto.create.mock.calls[0][0].data).toMatchObject({
+        ordenTrabajoId: 'wo-1',
         version: 3,
-        sentById: 'admin-1',
-        sentAt: SENT_AT,
+        enviadoPorId: 'admin-1',
+        enviadoEn: SENT_AT,
       });
-      // El reemplazo va antes de crear la nueva: nunca hay dos PENDING.
-      expect(tx.quote.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
-        tx.quote.create.mock.invocationCallOrder[0],
-      );
+      // El reemplazo va antes de crear la nueva: nunca hay dos PENDIENTE.
+      expect(
+        tx.presupuesto.updateMany.mock.invocationCallOrder[0],
+      ).toBeLessThan(tx.presupuesto.create.mock.invocationCallOrder[0]);
     });
 
     it('la primera es la v1', async () => {
-      tx.quote.findFirst.mockResolvedValue(null);
-      await service.send('wo-1', {}, ADMIN);
-      expect(tx.quote.create.mock.calls[0][0].data.version).toBe(1);
+      tx.presupuesto.findFirst.mockResolvedValue(null);
+      await service.send('wo-1', {}, ADMINISTRADOR);
+      expect(tx.presupuesto.create.mock.calls[0][0].data.version).toBe(1);
     });
 
-    it('la foto copia tipo, descripción, cantidad y precio, sin costo ni ítem vivo, en su orden', async () => {
-      await service.send('wo-1', {}, ADMIN);
-      expect(tx.quote.create.mock.calls[0][0].data.items).toEqual({
+    it('la foto copia tipo, descripción, cantidad y precio, sin costo ni detalle vivo, en su orden', async () => {
+      await service.send('wo-1', {}, ADMINISTRADOR);
+      expect(tx.presupuesto.create.mock.calls[0][0].data.detalles).toEqual({
         create: [
           {
-            type: 'SERVICE',
-            description: 'Cambio de aceite y filtro',
-            quantity: D('1'),
-            unitPrice: D('60'),
-            createdAt: SENT_AT,
+            tipo: 'SERVICIO',
+            descripcion: 'Cambio de aceite y filtro',
+            cantidad: D('1'),
+            precioUnitario: D('60'),
+            creadoEn: SENT_AT,
           },
           {
-            type: 'PRODUCT',
-            description: 'ACE-1030-LT · Aceite de motor 10W-30 (litro)',
-            quantity: D('1.25'),
-            unitPrice: D('38.90'),
+            tipo: 'PRODUCTO',
+            descripcion: 'ACE-1030-LT · Aceite de motor 10W-30 (litro)',
+            cantidad: D('1.25'),
+            precioUnitario: D('38.90'),
             // Un milisegundo después: la foto conserva el orden de la orden.
-            createdAt: new Date(SENT_AT.getTime() + 1),
+            creadoEn: new Date(SENT_AT.getTime() + 1),
           },
         ],
       });
     });
 
-    it('la foto sale de los ítems leídos dentro de la transacción, después de tomar la orden', async () => {
-      // Entre la lectura y la transacción, otro agregó un ítem: entra en la
+    it('la foto sale de los detalles leídos dentro de la transacción, después de tomar la orden', async () => {
+      // Entre la lectura y la transacción, otro agregó un detalle: entra en la
       // foto, porque se leen después de bloquear la orden.
       const late = {
         ...service1,
-        workOrderItemId: 'item-3',
-        description: 'Afinamiento',
-        unitPrice: D('180'),
+        detalleOrdenId: 'item-3',
+        descripcion: 'Afinamiento',
+        precioUnitario: D('180'),
       };
-      tx.workOrderItem.findMany.mockResolvedValue([service1, part1, late]);
-      await service.send('wo-1', {}, ADMIN);
-      expect(tx.workOrderItem.findMany).toHaveBeenCalledWith({
-        where: { workOrderId: 'wo-1' },
-        orderBy: [{ createdAt: 'asc' }, { workOrderItemId: 'asc' }],
+      tx.detalleOrden.findMany.mockResolvedValue([service1, part1, late]);
+      await service.send('wo-1', {}, ADMINISTRADOR);
+      expect(tx.detalleOrden.findMany).toHaveBeenCalledWith({
+        where: { ordenTrabajoId: 'wo-1' },
+        orderBy: [{ creadoEn: 'asc' }, { detalleOrdenId: 'asc' }],
       });
-      expect(tx.workOrder.update.mock.invocationCallOrder[0]).toBeLessThan(
-        tx.workOrderItem.findMany.mock.invocationCallOrder[0],
+      expect(tx.ordenTrabajo.update.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.detalleOrden.findMany.mock.invocationCallOrder[0],
       );
-      expect(tx.quote.create.mock.calls[0][0].data.items.create).toHaveLength(
-        3,
-      );
+      expect(
+        tx.presupuesto.create.mock.calls[0][0].data.detalles.create,
+      ).toHaveLength(3);
       // 60.00 + 48.63 + 180.00
-      expect(tx.quote.create.mock.calls[0][0].data.total.toFixed(2)).toBe(
+      expect(tx.presupuesto.create.mock.calls[0][0].data.total.toFixed(2)).toBe(
         '288.63',
       );
     });
 
     it('el total es el de la orden, con Decimal y redondeo por línea', async () => {
       // 1.25 × 38.90 = 48.625 → 48.63; 0.1 + 0.2 no pasa por coma flotante.
-      tx.workOrderItem.findMany.mockResolvedValue([
+      tx.detalleOrden.findMany.mockResolvedValue([
         part1,
-        { ...service1, unitPrice: D('0.10') },
-        { ...service1, unitPrice: D('0.20') },
+        { ...service1, precioUnitario: D('0.10') },
+        { ...service1, precioUnitario: D('0.20') },
       ]);
-      await service.send('wo-1', {}, ADMIN);
-      const { total } = tx.quote.create.mock.calls[0][0].data;
+      await service.send('wo-1', {}, ADMINISTRADOR);
+      const { total } = tx.presupuesto.create.mock.calls[0][0].data;
       expect(total).toBeInstanceOf(Prisma.Decimal);
       expect(total.toFixed(2)).toBe('48.93');
     });
@@ -200,25 +203,25 @@ describe('WorkOrderQuotesService', () => {
     it('lleva la orden a «Esperando aprobación» con el estado leído en el where y un evento público', async () => {
       await service.send(
         'wo-1',
-        { note: 'Incluye el cambio de la bomba de agua' },
-        ADMIN,
+        { nota: 'Incluye el cambio de la bomba de agua' },
+        ADMINISTRADOR,
       );
-      expect(tx.workOrder.update).toHaveBeenNthCalledWith(1, {
-        where: { workOrderId: 'wo-1', status: 'DIAGNOSIS' },
-        data: { status: 'WAITING_APPROVAL' },
-        select: { workOrderId: true },
+      expect(tx.ordenTrabajo.update).toHaveBeenNthCalledWith(1, {
+        where: { ordenTrabajoId: 'wo-1', estado: 'EN_DIAGNOSTICO' },
+        data: { estado: 'ESPERANDO_APROBACION' },
+        select: { ordenTrabajoId: true },
       });
-      expect(tx.workOrder.update).toHaveBeenNthCalledWith(2, {
-        where: { workOrderId: 'wo-1' },
+      expect(tx.ordenTrabajo.update).toHaveBeenNthCalledWith(2, {
+        where: { ordenTrabajoId: 'wo-1' },
         data: {
-          events: {
+          eventos: {
             create: {
-              status: 'WAITING_APPROVAL',
+              estado: 'ESPERANDO_APROBACION',
               // 60.00 + 48.63
-              note: 'Presupuesto v3 enviado: S/ 108.63\nIncluye el cambio de la bomba de agua',
-              isPublic: true,
-              createdById: 'admin-1',
-              createdAt: SENT_AT,
+              nota: 'Presupuesto v3 enviado: S/ 108.63\nIncluye el cambio de la bomba de agua',
+              esPublico: true,
+              creadoPorId: 'admin-1',
+              creadoEn: SENT_AT,
             },
           },
         },
@@ -227,33 +230,33 @@ describe('WorkOrderQuotesService', () => {
     });
 
     it('sin nota, el evento dice solo la versión y el total', async () => {
-      await service.send('wo-1', { note: null }, ADMIN);
-      expect(tx.workOrder.update.mock.calls[1][0].data.events.create.note).toBe(
-        'Presupuesto v3 enviado: S/ 108.63',
-      );
+      await service.send('wo-1', { nota: null }, ADMINISTRADOR);
+      expect(
+        tx.ordenTrabajo.update.mock.calls[1][0].data.eventos.create.nota,
+      ).toBe('Presupuesto v3 enviado: S/ 108.63');
     });
 
-    it.each(['IN_PROGRESS', 'WAITING_PARTS'])(
+    it.each(['EN_REPARACION', 'ESPERANDO_REPUESTOS'])(
       'también se envía a mitad de la reparación (%s)',
-      async (status) => {
-        workOrders.findOne.mockResolvedValue(order({ status }));
-        await service.send('wo-1', {}, ADMIN);
-        expect(tx.workOrder.update.mock.calls[0][0].where).toEqual({
-          workOrderId: 'wo-1',
-          status,
+      async (estado) => {
+        workOrders.findOne.mockResolvedValue(order({ estado }));
+        await service.send('wo-1', {}, ADMINISTRADOR);
+        expect(tx.ordenTrabajo.update.mock.calls[0][0].where).toEqual({
+          ordenTrabajoId: 'wo-1',
+          estado,
         });
       },
     );
 
     it.each([
-      ['RECEIVED', 'Recibido'],
-      ['WAITING_APPROVAL', 'Esperando aprobación'],
-      ['READY', 'Listo para recoger'],
-      ['DELIVERED', 'Entregado'],
-      ['CANCELLED', 'Cancelado'],
-    ])('con la orden en %s: 409 y nada se escribe', async (status, label) => {
-      workOrders.findOne.mockResolvedValue(order({ status }));
-      await expect(service.send('wo-1', {}, ADMIN)).rejects.toThrow(
+      ['RECIBIDO', 'Recibido'],
+      ['ESPERANDO_APROBACION', 'Esperando aprobación'],
+      ['LISTO', 'Listo para recoger'],
+      ['ENTREGADO', 'Entregado'],
+      ['CANCELADO', 'Cancelado'],
+    ])('con la orden en %s: 409 y nada se escribe', async (estado, label) => {
+      workOrders.findOne.mockResolvedValue(order({ estado }));
+      await expect(service.send('wo-1', {}, ADMINISTRADOR)).rejects.toThrow(
         new ConflictException(
           `No se puede enviar un presupuesto con la orden en «${label}»: se envía en diagnóstico, en reparación o esperando repuestos`,
         ),
@@ -261,9 +264,9 @@ describe('WorkOrderQuotesService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('sin ítems: 400 y nada se escribe', async () => {
-      workOrders.findOne.mockResolvedValue(order({ items: [] }));
-      await expect(service.send('wo-1', {}, ADMIN)).rejects.toThrow(
+    it('sin detalles: 400 y nada se escribe', async () => {
+      workOrders.findOne.mockResolvedValue(order({ detalles: [] }));
+      await expect(service.send('wo-1', {}, ADMINISTRADOR)).rejects.toThrow(
         new BadRequestException(
           'Agrega al menos un servicio o repuesto antes de enviar el presupuesto',
         ),
@@ -271,30 +274,30 @@ describe('WorkOrderQuotesService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('si quitaron el último ítem entre medio: 400 dentro de la transacción, sin presupuesto', async () => {
-      tx.workOrderItem.findMany.mockResolvedValue([]);
-      await expect(service.send('wo-1', {}, ADMIN)).rejects.toThrow(
+    it('si quitaron el último detalle entre medio: 400 dentro de la transacción, sin presupuesto', async () => {
+      tx.detalleOrden.findMany.mockResolvedValue([]);
+      await expect(service.send('wo-1', {}, ADMINISTRADOR)).rejects.toThrow(
         BadRequestException,
       );
-      expect(tx.quote.create).not.toHaveBeenCalled();
+      expect(tx.presupuesto.create).not.toHaveBeenCalled();
     });
 
     it('si la orden cambió de estado entre medio: 409 y no se crea nada', async () => {
-      tx.workOrder.update.mockRejectedValueOnce(knownError('P2025'));
-      await expect(service.send('wo-1', {}, ADMIN)).rejects.toThrow(
+      tx.ordenTrabajo.update.mockRejectedValueOnce(knownError('P2025'));
+      await expect(service.send('wo-1', {}, ADMINISTRADOR)).rejects.toThrow(
         new ConflictException(
           'La orden cambió de estado mientras tanto: vuelve a cargarla',
         ),
       );
-      expect(tx.quote.updateMany).not.toHaveBeenCalled();
-      expect(tx.quote.create).not.toHaveBeenCalled();
+      expect(tx.presupuesto.updateMany).not.toHaveBeenCalled();
+      expect(tx.presupuesto.create).not.toHaveBeenCalled();
     });
 
     it('una orden que el actor no ve no existe (404 de findOne)', async () => {
       workOrders.findOne.mockRejectedValue(
         new NotFoundException('No se encontró la orden de trabajo'),
       );
-      await expect(service.send('wo-1', {}, ADMIN)).rejects.toThrow(
+      await expect(service.send('wo-1', {}, ADMINISTRADOR)).rejects.toThrow(
         NotFoundException,
       );
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -302,8 +305,8 @@ describe('WorkOrderQuotesService', () => {
   });
 
   describe('decide', () => {
-    const waiting = (quotes: unknown[] = [quote()]) =>
-      order({ status: 'WAITING_APPROVAL', quotes });
+    const waiting = (presupuestos: unknown[] = [presupuesto()]) =>
+      order({ estado: 'ESPERANDO_APROBACION', presupuestos });
 
     beforeEach(() => {
       workOrders.findOne.mockResolvedValue(waiting());
@@ -313,30 +316,30 @@ describe('WorkOrderQuotesService', () => {
       await service.decide(
         'wo-1',
         'q-2',
-        { decision: 'APPROVED', channel: 'WHATSAPP', note: 'Pide factura' },
-        ADMIN,
+        { decision: 'APROBADO', canal: 'WHATSAPP', nota: 'Pide factura' },
+        ADMINISTRADOR,
       );
-      expect(tx.quote.updateMany).toHaveBeenCalledWith({
-        where: { quoteId: 'q-2', status: 'PENDING' },
+      expect(tx.presupuesto.updateMany).toHaveBeenCalledWith({
+        where: { presupuestoId: 'q-2', estado: 'PENDIENTE' },
         data: {
-          status: 'APPROVED',
-          decidedById: 'admin-1',
-          decidedAt: SENT_AT,
-          decisionChannel: 'WHATSAPP',
-          decisionNote: 'Pide factura',
+          estado: 'APROBADO',
+          decididoPorId: 'admin-1',
+          decididoEn: SENT_AT,
+          canalDecision: 'WHATSAPP',
+          notaDecision: 'Pide factura',
         },
       });
-      expect(tx.workOrder.update).toHaveBeenCalledWith({
-        where: { workOrderId: 'wo-1', status: 'WAITING_APPROVAL' },
+      expect(tx.ordenTrabajo.update).toHaveBeenCalledWith({
+        where: { ordenTrabajoId: 'wo-1', estado: 'ESPERANDO_APROBACION' },
         data: {
-          status: 'IN_PROGRESS',
-          events: {
+          estado: 'EN_REPARACION',
+          eventos: {
             create: {
-              status: 'IN_PROGRESS',
-              note: 'Presupuesto v2 aprobado',
-              isPublic: true,
-              createdById: 'admin-1',
-              createdAt: SENT_AT,
+              estado: 'EN_REPARACION',
+              nota: 'Presupuesto v2 aprobado',
+              esPublico: true,
+              creadoPorId: 'admin-1',
+              creadoEn: SENT_AT,
             },
           },
         },
@@ -348,41 +351,47 @@ describe('WorkOrderQuotesService', () => {
       await service.decide(
         'wo-1',
         'q-2',
-        { decision: 'REJECTED', channel: 'PHONE' },
-        ADMIN,
+        { decision: 'RECHAZADO', canal: 'TELEFONO' },
+        ADMINISTRADOR,
       );
-      expect(tx.quote.updateMany.mock.calls[0][0].data).toMatchObject({
-        status: 'REJECTED',
-        decisionChannel: 'PHONE',
-        decisionNote: null,
+      expect(tx.presupuesto.updateMany.mock.calls[0][0].data).toMatchObject({
+        estado: 'RECHAZADO',
+        canalDecision: 'TELEFONO',
+        notaDecision: null,
       });
-      expect(tx.workOrder.update.mock.calls[0][0].data).toMatchObject({
-        status: 'DIAGNOSIS',
-        events: {
-          create: { status: 'DIAGNOSIS', note: 'Presupuesto v2 rechazado' },
+      expect(tx.ordenTrabajo.update.mock.calls[0][0].data).toMatchObject({
+        estado: 'EN_DIAGNOSTICO',
+        eventos: {
+          create: {
+            estado: 'EN_DIAGNOSTICO',
+            nota: 'Presupuesto v2 rechazado',
+          },
         },
       });
     });
 
     it.each([
-      ['APPROVED', 'El presupuesto v1 ya se registró como aprobado'],
-      ['REJECTED', 'El presupuesto v1 ya se registró como rechazado'],
+      ['APROBADO', 'El presupuesto v1 ya se registró como aprobado'],
+      ['RECHAZADO', 'El presupuesto v1 ya se registró como rechazado'],
       [
-        'SUPERSEDED',
+        'REEMPLAZADO',
         'El presupuesto v1 fue reemplazado por una versión más nueva',
       ],
     ])(
       'solo sobre la versión pendiente: una %s da 409',
-      async (status, message) => {
+      async (estado, message) => {
         workOrders.findOne.mockResolvedValue(
-          waiting([quote(), quote({ quoteId: 'q-1', version: 1, status })]),
+          waiting([
+            presupuesto(),
+            presupuesto({ presupuestoId: 'q-1', version: 1, estado }),
+          ]),
         );
         await expect(
           service.decide(
             'wo-1',
             'q-1',
-            { decision: 'APPROVED', channel: 'PHONE' },
-            ADMIN,
+            { decision: 'APROBADO', canal: 'TELEFONO' },
+            ADMINISTRADOR,
           ),
         ).rejects.toThrow(new ConflictException(message));
         expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -394,8 +403,8 @@ describe('WorkOrderQuotesService', () => {
         service.decide(
           'wo-1',
           'q-otra',
-          { decision: 'APPROVED', channel: 'PHONE' },
-          ADMIN,
+          { decision: 'APROBADO', canal: 'TELEFONO' },
+          ADMINISTRADOR,
         ),
       ).rejects.toThrow(
         new NotFoundException('No se encontró el presupuesto en esta orden'),
@@ -404,14 +413,14 @@ describe('WorkOrderQuotesService', () => {
 
     it('una pendiente en una orden que ya no espera (cancelada): 409', async () => {
       workOrders.findOne.mockResolvedValue(
-        order({ status: 'CANCELLED', quotes: [quote()] }),
+        order({ estado: 'CANCELADO', presupuestos: [presupuesto()] }),
       );
       await expect(
         service.decide(
           'wo-1',
           'q-2',
-          { decision: 'APPROVED', channel: 'IN_PERSON' },
-          ADMIN,
+          { decision: 'APROBADO', canal: 'EN_PERSONA' },
+          ADMINISTRADOR,
         ),
       ).rejects.toThrow(
         new ConflictException(
@@ -422,30 +431,30 @@ describe('WorkOrderQuotesService', () => {
     });
 
     it('si otro registró la respuesta entre medio: 409 y la orden no se mueve', async () => {
-      tx.quote.updateMany.mockResolvedValue({ count: 0 });
+      tx.presupuesto.updateMany.mockResolvedValue({ count: 0 });
       await expect(
         service.decide(
           'wo-1',
           'q-2',
-          { decision: 'REJECTED', channel: 'PHONE' },
-          ADMIN,
+          { decision: 'RECHAZADO', canal: 'TELEFONO' },
+          ADMINISTRADOR,
         ),
       ).rejects.toThrow(
         new ConflictException(
           'El presupuesto cambió mientras tanto: vuelve a cargar la orden',
         ),
       );
-      expect(tx.workOrder.update).not.toHaveBeenCalled();
+      expect(tx.ordenTrabajo.update).not.toHaveBeenCalled();
     });
 
     it('si la orden cambió de estado entre medio: 409 (y la decisión se deshace con la transacción)', async () => {
-      tx.workOrder.update.mockRejectedValue(knownError('P2025'));
+      tx.ordenTrabajo.update.mockRejectedValue(knownError('P2025'));
       await expect(
         service.decide(
           'wo-1',
           'q-2',
-          { decision: 'APPROVED', channel: 'PHONE' },
-          ADMIN,
+          { decision: 'APROBADO', canal: 'TELEFONO' },
+          ADMINISTRADOR,
         ),
       ).rejects.toThrow(
         new ConflictException(
@@ -455,20 +464,20 @@ describe('WorkOrderQuotesService', () => {
     });
 
     it('otro error de la base no se disfraza de 409', async () => {
-      tx.workOrder.update.mockRejectedValue(knownError('P2003'));
+      tx.ordenTrabajo.update.mockRejectedValue(knownError('P2003'));
       await expect(
         service.decide(
           'wo-1',
           'q-2',
-          { decision: 'APPROVED', channel: 'PHONE' },
-          ADMIN,
+          { decision: 'APROBADO', canal: 'TELEFONO' },
+          ADMINISTRADOR,
         ),
       ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
     });
   });
   describe('decideByCustomer', () => {
-    const waiting = (quotes: unknown[] = [quote()]) =>
-      order({ status: 'WAITING_APPROVAL', quotes });
+    const waiting = (presupuestos: unknown[] = [presupuesto()]) =>
+      order({ estado: 'ESPERANDO_APROBACION', presupuestos });
 
     beforeEach(() => {
       workOrders.findOneForCustomer.mockResolvedValue(waiting());
@@ -478,7 +487,7 @@ describe('WorkOrderQuotesService', () => {
       await service.decideByCustomer(
         'wo-1',
         'q-2',
-        { decision: 'APPROVED' },
+        { decision: 'APROBADO' },
         'cust-1',
       );
       expect(workOrders.findOneForCustomer).toHaveBeenCalledWith(
@@ -492,30 +501,30 @@ describe('WorkOrderQuotesService', () => {
       await service.decideByCustomer(
         'wo-1',
         'q-2',
-        { decision: 'APPROVED', note: 'Adelante' },
+        { decision: 'APROBADO', nota: 'Adelante' },
         'cust-1',
       );
-      expect(tx.quote.updateMany).toHaveBeenCalledWith({
-        where: { quoteId: 'q-2', status: 'PENDING' },
+      expect(tx.presupuesto.updateMany).toHaveBeenCalledWith({
+        where: { presupuestoId: 'q-2', estado: 'PENDIENTE' },
         data: {
-          status: 'APPROVED',
-          decidedById: null,
-          decidedAt: SENT_AT,
-          decisionChannel: 'PORTAL',
-          decisionNote: 'Adelante',
+          estado: 'APROBADO',
+          decididoPorId: null,
+          decididoEn: SENT_AT,
+          canalDecision: 'PORTAL',
+          notaDecision: 'Adelante',
         },
       });
-      expect(tx.workOrder.update).toHaveBeenCalledWith(
+      expect(tx.ordenTrabajo.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
-            status: 'IN_PROGRESS',
-            events: {
+            estado: 'EN_REPARACION',
+            eventos: {
               create: {
-                status: 'IN_PROGRESS',
-                note: 'Presupuesto v2 aprobado por el cliente desde el portal',
-                isPublic: true,
-                createdById: null,
-                createdAt: SENT_AT,
+                estado: 'EN_REPARACION',
+                nota: 'Presupuesto v2 aprobado por el cliente desde el portal',
+                esPublico: true,
+                creadoPorId: null,
+                creadoEn: SENT_AT,
               },
             },
           },
@@ -527,12 +536,12 @@ describe('WorkOrderQuotesService', () => {
       await service.decideByCustomer(
         'wo-1',
         'q-2',
-        { decision: 'REJECTED' },
+        { decision: 'RECHAZADO' },
         'cust-1',
       );
-      expect(tx.workOrder.update).toHaveBeenCalledWith(
+      expect(tx.ordenTrabajo.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'DIAGNOSIS' }),
+          data: expect.objectContaining({ estado: 'EN_DIAGNOSTICO' }),
         }),
       );
     });
@@ -542,20 +551,20 @@ describe('WorkOrderQuotesService', () => {
         new NotFoundException('No se encontró la orden de trabajo'),
       );
       await expect(
-        service.decideByCustomer('wo-1', 'q-2', { decision: 'APPROVED' }, 'x'),
+        service.decideByCustomer('wo-1', 'q-2', { decision: 'APROBADO' }, 'x'),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('con la respuesta ya registrada (por el taller), 409 y nada se escribe', async () => {
       workOrders.findOneForCustomer.mockResolvedValue(
-        waiting([quote({ status: 'APPROVED' })]),
+        waiting([presupuesto({ estado: 'APROBADO' })]),
       );
       await expect(
         service.decideByCustomer(
           'wo-1',
           'q-2',
-          { decision: 'REJECTED' },
+          { decision: 'RECHAZADO' },
           'cust-1',
         ),
       ).rejects.toThrow(
@@ -566,25 +575,25 @@ describe('WorkOrderQuotesService', () => {
 
     it('si la orden ya no espera aprobación (la cancelaron), 409', async () => {
       workOrders.findOneForCustomer.mockResolvedValue(
-        order({ status: 'CANCELLED', quotes: [quote()] }),
+        order({ estado: 'CANCELADO', presupuestos: [presupuesto()] }),
       );
       await expect(
         service.decideByCustomer(
           'wo-1',
           'q-2',
-          { decision: 'APPROVED' },
+          { decision: 'APROBADO' },
           'cust-1',
         ),
       ).rejects.toThrow(ConflictException);
     });
 
     it('si el taller registró la respuesta entre medio, 409', async () => {
-      tx.quote.updateMany.mockResolvedValue({ count: 0 });
+      tx.presupuesto.updateMany.mockResolvedValue({ count: 0 });
       await expect(
         service.decideByCustomer(
           'wo-1',
           'q-2',
-          { decision: 'APPROVED' },
+          { decision: 'APROBADO' },
           'cust-1',
         ),
       ).rejects.toThrow(
@@ -592,7 +601,7 @@ describe('WorkOrderQuotesService', () => {
           'El presupuesto cambió mientras tanto: vuelve a cargar la orden',
         ),
       );
-      expect(tx.workOrder.update).not.toHaveBeenCalled();
+      expect(tx.ordenTrabajo.update).not.toHaveBeenCalled();
     });
   });
 });

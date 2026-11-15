@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Customer as CustomerModel } from '../../../../generated/prisma/client.js';
+import type { Cliente as CustomerModel } from '../../../../generated/prisma/client.js';
 
 export type WorkOrderCustomerModel = Pick<
   CustomerModel,
-  'customerId' | 'name' | 'phone'
+  'clienteId' | 'nombre' | 'telefono'
 >;
 
 /**
@@ -11,18 +11,18 @@ export type WorkOrderCustomerModel = Pick<
  * teléfono para avisarle que su vehículo está listo.
  */
 export class WorkOrderCustomer {
-  constructor(customer: WorkOrderCustomerModel) {
-    this.customerId = customer.customerId;
-    this.name = customer.name;
-    this.phone = customer.phone;
+  constructor(cliente: WorkOrderCustomerModel) {
+    this.clienteId = cliente.clienteId;
+    this.nombre = cliente.nombre;
+    this.telefono = cliente.telefono;
   }
 
   @ApiProperty({ format: 'uuid' })
-  customerId: string;
+  clienteId: string;
 
   @ApiProperty({ example: 'Juan Pérez Rojas' })
-  name: string;
+  nombre: string;
 
   @ApiProperty({ example: '987654321' })
-  phone: string;
+  telefono: string;
 }

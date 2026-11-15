@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma/prisma.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import { StockMovementType } from '../../../generated/prisma/enums.js';
+import { TipoMovimiento } from '../../../generated/prisma/enums.js';
 import { limaDayRange } from '../../../shared/lima-dates.js';
 import {
   pageWindow,
@@ -25,37 +25,35 @@ import type { StockMovementWithRelations } from './entities/stock-movement.entit
 // movimiento: es leer el modelo de este módulo, no consultar las tablas de
 // productos o usuarios por su cuenta.
 const WITH_RELATIONS = {
-  product: {
-    select: { productId: true, code: true, name: true, unit: true },
+  producto: {
+    select: { productoId: true, codigo: true, nombre: true, unidad: true },
   },
-  createdBy: { select: { userId: true, name: true } },
-} satisfies Prisma.StockMovementInclude;
+  creadoPor: { select: { usuarioId: true, nombre: true } },
+} satisfies Prisma.MovimientoStockInclude;
 
 const NOT_FOUND = 'No se encontró el movimiento';
 const INVERTED_RANGE = 'La fecha desde no puede ser posterior a la fecha hasta';
 
 /**
  * Un movimiento por registrar: el cambio de stock que aplica al producto, más
- * quién lo registra y su nota. El consumo en una orden lleva el ítem que lo
- * generó (un ítem mueve stock una sola vez). La devolución de un ítem quitado
- * de la orden también es WORK_ORDER —revierte un consumo, no es un ajuste de
- * inventario—, pero va sin ítem (ya no existe) y con la nota obligatoria, que
- * dice de qué orden vuelve.
+ * quién lo registra y su nota. El consumo en una orden lleva el detalle que lo
+ * generó (un detalle mueve stock una sola vez). La devolución de un detalle
+ * quitado de la orden también es ORDEN_TRABAJO —revierte un consumo, no es un
+ * ajuste de inventario—, pero va sin detalle (ya no existe) y con la nota
+ * obligatoria, que dice de qué orden vuelve.
  */
 export type NewStockMovement = StockChange & {
-  createdById: string;
-  note?: string | null;
+  creadoPorId: string;
+  nota?: string | null;
 } & (
-    | { type: typeof StockMovementType.WORK_ORDER; workOrderItemId: string }
+    | { tipo: typeof TipoMovimiento.ORDEN_TRABAJO; detalleOrdenId: string }
     | {
-        type: typeof StockMovementType.WORK_ORDER;
-        workOrderItemId: null;
-        note: string;
+        tipo: typeof TipoMovimiento.ORDEN_TRABAJO;
+        detalleOrdenId: null;
+        nota: string;
       }
     | {
-        type:
-          | typeof StockMovementType.PURCHASE
-          | typeof StockMovementType.ADJUSTMENT;
+        tipo: typeof TipoMovimiento.COMPRA | typeof TipoMovimiento.AJUSTE;
       }
   );
 
@@ -70,31 +68,33 @@ export class StockMovementsService {
     query: ListStockMovementsQueryDto,
   ): Promise<Page<StockMovementWithRelations>> {
     // Comparar el texto basta: AAAA-MM-DD ordena igual que las fechas.
-    if (query.from && query.to && query.from > query.to) {
+    if (query.desde && query.hasta && query.desde > query.hasta) {
       throw new BadRequestException(INVERTED_RANGE);
     }
     const where = stockMovementsWhere(query);
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.stockMovement.findMany({
+      this.prisma.movimientoStock.findMany({
         where,
         include: WITH_RELATIONS,
         // El desempate por id hace que la paginación sea estable: con varios
         // movimientos del mismo instante o la misma cantidad, el orden no
         // cambia entre páginas.
         orderBy: [
-          { [query.sortBy]: query.sortOrder },
-          { stockMovementId: 'asc' },
+          { [query.ordenarPor]: query.sentido },
+          { movimientoStockId: 'asc' },
         ],
         ...pageWindow(query.page, query.pageSize),
       }),
-      this.prisma.stockMovement.count({ where }),
+      this.prisma.movimientoStock.count({ where }),
     ]);
     return { items, meta: paginationMeta(query.page, query.pageSize, total) };
   }
 
-  async findOne(stockMovementId: string): Promise<StockMovementWithRelations> {
-    const movement = await this.prisma.stockMovement.findUnique({
-      where: { stockMovementId },
+  async findOne(
+    movimientoStockId: string,
+  ): Promise<StockMovementWithRelations> {
+    const movement = await this.prisma.movimientoStock.findUnique({
+      where: { movimientoStockId },
       include: WITH_RELATIONS,
     });
     if (!movement) throw new NotFoundException(NOT_FOUND);
@@ -103,31 +103,31 @@ export class StockMovementsService {
 
   purchase(
     dto: CreatePurchaseDto,
-    createdById: string,
+    creadoPorId: string,
   ): Promise<StockMovementWithRelations> {
     return this.prisma.$transaction((tx) =>
       this.record(tx, {
-        type: StockMovementType.PURCHASE,
-        productId: dto.productId,
-        quantity: dto.quantity,
-        unitCost: dto.unitCost,
-        note: dto.note,
-        createdById,
+        tipo: TipoMovimiento.COMPRA,
+        productoId: dto.productoId,
+        cantidad: dto.cantidad,
+        costoUnitario: dto.costoUnitario,
+        nota: dto.nota,
+        creadoPorId,
       }),
     );
   }
 
   adjust(
     dto: CreateAdjustmentDto,
-    createdById: string,
+    creadoPorId: string,
   ): Promise<StockMovementWithRelations> {
     return this.prisma.$transaction((tx) =>
       this.record(tx, {
-        type: StockMovementType.ADJUSTMENT,
-        productId: dto.productId,
-        quantity: dto.quantity,
-        note: dto.note,
-        createdById,
+        tipo: TipoMovimiento.AJUSTE,
+        productoId: dto.productoId,
+        cantidad: dto.cantidad,
+        nota: dto.nota,
+        creadoPorId,
       }),
     );
   }
@@ -135,10 +135,10 @@ export class StockMovementsService {
   /**
    * Registra un movimiento y mueve el stock del producto en la transacción
    * `tx` del llamador: o se guardan los dos o ninguno. Las compras y los
-   * ajustes abren la suya; el consumo en una orden la comparte con el ítem
-   * que lo genera, para que el ítem no quede sin su salida (y la devolución,
-   * con el borrado del ítem, para que no vuelva dos veces). Un movimiento no
-   * se edita ni se borra: se corrige con un ajuste.
+   * ajustes abren la suya; el consumo en una orden la comparte con el detalle
+   * que lo genera, para que el detalle no quede sin su salida (y la
+   * devolución, con el borrado del detalle, para que no vuelva dos veces). Un
+   * movimiento no se edita ni se borra: se corrige con un ajuste.
    *
    * El costo unitario es el del producto después de aplicar el cambio: en una
    * compra, el de la compra (que pasó a ser el del producto); en un ajuste o
@@ -149,18 +149,18 @@ export class StockMovementsService {
     movement: NewStockMovement,
   ): Promise<StockMovementWithRelations> {
     const product = await this.products.applyStockChange(tx, movement);
-    return tx.stockMovement.create({
+    return tx.movimientoStock.create({
       data: {
-        productId: movement.productId,
-        type: movement.type,
-        quantity: movement.quantity,
-        unitCost: product.cost,
-        workOrderItemId:
-          movement.type === StockMovementType.WORK_ORDER
-            ? movement.workOrderItemId
+        productoId: movement.productoId,
+        tipo: movement.tipo,
+        cantidad: movement.cantidad,
+        costoUnitario: product.costo,
+        detalleOrdenId:
+          movement.tipo === TipoMovimiento.ORDEN_TRABAJO
+            ? movement.detalleOrdenId
             : null,
-        note: movement.note ?? null,
-        createdById: movement.createdById,
+        nota: movement.nota ?? null,
+        creadoPorId: movement.creadoPorId,
       },
       include: WITH_RELATIONS,
     });
@@ -168,25 +168,25 @@ export class StockMovementsService {
 }
 
 /**
- * El `where` del listado. El rango de fechas son días de Lima: `to` incluye su
- * día entero.
+ * El `where` del listado. El rango de fechas son días de Lima: `hasta`
+ * incluye su día entero.
  */
 export function stockMovementsWhere(
   query: Pick<
     ListStockMovementsQueryDto,
-    'search' | 'type' | 'productId' | 'from' | 'to'
+    'search' | 'tipo' | 'productoId' | 'desde' | 'hasta'
   >,
-): Prisma.StockMovementWhereInput {
+): Prisma.MovimientoStockWhereInput {
   const text = { contains: query.search, mode: 'insensitive' } as const;
   return {
-    type: query.type,
-    productId: query.productId,
-    createdAt: limaDayRange(query.from, query.to),
+    tipo: query.tipo,
+    productoId: query.productoId,
+    creadoEn: limaDayRange(query.desde, query.hasta),
     ...(query.search && {
       OR: [
-        { product: { code: text } },
-        { product: { name: text } },
-        { note: text },
+        { producto: { codigo: text } },
+        { producto: { nombre: text } },
+        { nota: text },
       ],
     }),
   };

@@ -26,44 +26,49 @@ export class PortalService {
   ) {}
 
   vehiclesOf(
-    customerId: string,
+    clienteId: string,
     query: ListPortalVehiclesQueryDto,
   ): Promise<Page<VehicleWithRelations>> {
-    return this.vehicles.findForCustomer(customerId, query);
+    return this.vehicles.findForCustomer(clienteId, query);
   }
 
   vehicle(
-    customerId: string,
-    vehicleId: string,
+    clienteId: string,
+    vehiculoId: string,
   ): Promise<VehicleWithRelations> {
-    return this.vehicles.findOneForCustomer(vehicleId, customerId);
+    return this.vehicles.findOneForCustomer(vehiculoId, clienteId);
   }
 
   workOrdersOf(
-    customerId: string,
+    clienteId: string,
     query: ListPortalWorkOrdersQueryDto,
   ): Promise<Page<WorkOrderWithPendingQuote>> {
-    return this.workOrders.findAllForCustomer(customerId, {
-      open: query.state === 'OPEN',
-      vehicleId: query.vehicleId,
+    return this.workOrders.findAllForCustomer(clienteId, {
+      enCurso: query.estado === 'EN_CURSO',
+      vehiculoId: query.vehiculoId,
       page: query.page,
       pageSize: query.pageSize,
     });
   }
 
   workOrder(
-    customerId: string,
-    workOrderId: string,
+    clienteId: string,
+    ordenTrabajoId: string,
   ): Promise<WorkOrderWithTimeline> {
-    return this.workOrders.findOneForCustomer(workOrderId, customerId);
+    return this.workOrders.findOneForCustomer(ordenTrabajoId, clienteId);
   }
 
   decide(
-    customerId: string,
-    workOrderId: string,
-    quoteId: string,
+    clienteId: string,
+    ordenTrabajoId: string,
+    presupuestoId: string,
     dto: DecidePortalQuoteDto,
   ): Promise<WorkOrderWithTimeline> {
-    return this.quotes.decideByCustomer(workOrderId, quoteId, dto, customerId);
+    return this.quotes.decideByCustomer(
+      ordenTrabajoId,
+      presupuestoId,
+      dto,
+      clienteId,
+    );
   }
 }

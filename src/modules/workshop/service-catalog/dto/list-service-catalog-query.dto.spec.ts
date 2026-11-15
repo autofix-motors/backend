@@ -15,37 +15,40 @@ async function errorsOf(query: Record<string, string>) {
 describe('ListServiceCatalogQueryDto', () => {
   it('convierte el estado y deja el rango de precio como texto', async () => {
     const { dto, messages } = await errorsOf({
-      isActive: 'false',
-      minPrice: ' 50 ',
-      maxPrice: '200.5',
+      activo: 'false',
+      precioMinimo: ' 50 ',
+      precioMaximo: '200.5',
     });
     expect(messages).toEqual([]);
     expect(dto).toMatchObject({
-      isActive: false,
-      minPrice: '50',
-      maxPrice: '200.5',
-      sortBy: 'name',
-      sortOrder: 'asc',
+      activo: false,
+      precioMinimo: '50',
+      precioMaximo: '200.5',
+      ordenarPor: 'nombre',
+      sentido: 'asc',
     });
   });
 
   it('un precio vacío es lo mismo que no filtrar', async () => {
-    const { dto, messages } = await errorsOf({ minPrice: '', maxPrice: ' ' });
+    const { dto, messages } = await errorsOf({
+      precioMinimo: '',
+      precioMaximo: ' ',
+    });
     expect(messages).toEqual([]);
-    expect(dto.minPrice).toBeUndefined();
-    expect(dto.maxPrice).toBeUndefined();
+    expect(dto.precioMinimo).toBeUndefined();
+    expect(dto.precioMaximo).toBeUndefined();
   });
 
   it('rechaza un precio mal escrito y un orden que no existe', async () => {
     const { messages } = await errorsOf({
-      minPrice: '-1',
-      maxPrice: 'abc',
-      sortBy: 'description',
+      precioMinimo: '-1',
+      precioMaximo: 'abc',
+      ordenarPor: 'descripcion',
     });
     expect(messages).toEqual([
       'El precio mínimo no puede ser negativo',
       'El precio máximo es un monto en soles con hasta 2 decimales, por ejemplo 120.50',
-      'Se ordena por name, laborPrice o createdAt',
+      'Se ordena por nombre, precioManoObra o creadoEn',
     ]);
   });
 });

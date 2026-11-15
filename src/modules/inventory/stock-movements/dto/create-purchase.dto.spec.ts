@@ -14,38 +14,38 @@ async function errorsOf(body: Record<string, unknown>) {
 }
 
 const valid = {
-  productId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-  quantity: '12',
-  unitCost: '18.50',
+  productoId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+  cantidad: '12',
+  costoUnitario: '18.50',
 };
 
 describe('CreatePurchaseDto', () => {
   it('acepta una compra con cantidad y costo como texto o número', async () => {
     const { dto, messages } = await errorsOf({
       ...valid,
-      quantity: 4.5,
-      unitCost: 68,
+      cantidad: 4.5,
+      costoUnitario: 68,
     });
     expect(messages).toEqual([]);
-    expect(dto.quantity).toBe('4.5');
-    expect(dto.unitCost).toBe('68');
+    expect(dto.cantidad).toBe('4.5');
+    expect(dto.costoUnitario).toBe('68');
   });
 
   it('la cantidad tiene que ser mayor que 0', async () => {
-    expect((await errorsOf({ ...valid, quantity: '0' })).messages).toEqual([
+    expect((await errorsOf({ ...valid, cantidad: '0' })).messages).toEqual([
       'La cantidad tiene que ser mayor que 0',
     ]);
-    expect((await errorsOf({ ...valid, quantity: '0.00' })).messages).toEqual([
+    expect((await errorsOf({ ...valid, cantidad: '0.00' })).messages).toEqual([
       'La cantidad tiene que ser mayor que 0',
     ]);
-    expect((await errorsOf({ ...valid, quantity: '-3' })).messages).toEqual([
+    expect((await errorsOf({ ...valid, cantidad: '-3' })).messages).toEqual([
       'La cantidad tiene que ser mayor que 0',
     ]);
   });
 
   it('valida la cantidad y el costo como Decimal(10, 2)', async () => {
     expect(
-      (await errorsOf({ ...valid, quantity: '1.255', unitCost: '12,50' }))
+      (await errorsOf({ ...valid, cantidad: '1.255', costoUnitario: '12,50' }))
         .messages,
     ).toEqual([
       'La cantidad tiene como máximo 2 decimales',
@@ -57,9 +57,9 @@ describe('CreatePurchaseDto', () => {
     expect(
       (
         await errorsOf({
-          productId: 'no-es-un-id',
-          quantity: ' ',
-          unitCost: '',
+          productoId: 'no-es-un-id',
+          cantidad: ' ',
+          costoUnitario: '',
         })
       ).messages,
     ).toEqual([
@@ -70,11 +70,11 @@ describe('CreatePurchaseDto', () => {
   });
 
   it('la nota es opcional: en blanco queda como null', async () => {
-    const { dto, messages } = await errorsOf({ ...valid, note: '   ' });
+    const { dto, messages } = await errorsOf({ ...valid, nota: '   ' });
     expect(messages).toEqual([]);
-    expect(dto.note).toBeNull();
+    expect(dto.nota).toBeNull();
     expect(
-      (await errorsOf({ ...valid, note: 'x'.repeat(501) })).messages,
+      (await errorsOf({ ...valid, nota: 'x'.repeat(501) })).messages,
     ).toEqual(['La nota tiene como máximo 500 caracteres']);
   });
 });

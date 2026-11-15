@@ -5,7 +5,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { UserRole } from '../../generated/prisma/enums.js';
+import type { RolUsuario } from '../../generated/prisma/enums.js';
 import type { RequestWithSession } from '../auth/session-user.js';
 import { ANY_SESSION_KEY } from '../decorators/any-session.decorator.js';
 import { CUSTOMER_ONLY_KEY } from '../decorators/customer-only.decorator.js';
@@ -45,23 +45,23 @@ export class RolesGuard implements CanActivate {
       CUSTOMER_ONLY_KEY,
       targets,
     );
-    const { user, customer } = context
+    const { usuario, cliente } = context
       .switchToHttp()
       .getRequest<RequestWithSession>();
 
-    if (customer) {
+    if (cliente) {
       if (isAnySession || isCustomerOnly) return true;
       throw new ForbiddenException(FORBIDDEN);
     }
-    if (!user) throw new ForbiddenException(FORBIDDEN);
+    if (!usuario) throw new ForbiddenException(FORBIDDEN);
     if (isAnySession) return true;
     if (isCustomerOnly) throw new ForbiddenException(FORBIDDEN);
 
-    const allowed = this.reflector.getAllAndOverride<UserRole[] | undefined>(
+    const allowed = this.reflector.getAllAndOverride<RolUsuario[] | undefined>(
       ROLES_KEY,
       targets,
     );
-    if (allowed?.length && !allowed.includes(user.role)) {
+    if (allowed?.length && !allowed.includes(usuario.rol)) {
       throw new ForbiddenException(FORBIDDEN);
     }
     return true;

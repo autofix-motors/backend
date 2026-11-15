@@ -22,5 +22,5 @@ export class UpdateWorkOrderDiagnosisDto {
     message: 'El diagnóstico tiene como máximo 4000 caracteres',
   })
   @IsString({ message: 'Escribe el diagnóstico, o null para borrarlo' })
-  diagnosis: string | null;
+  diagnostico: string | null;
 }

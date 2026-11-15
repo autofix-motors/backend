@@ -5,17 +5,21 @@ import { itemSubtotal, workOrderAmounts } from './work-order-totals.js';
 // dan un céntimo de más o de menos.
 
 const D = (value: string) => new Prisma.Decimal(value);
-const service = (quantity: string, unitPrice: string) => ({
-  type: 'SERVICE' as const,
-  quantity: D(quantity),
-  unitPrice: D(unitPrice),
-  unitCost: null,
+const service = (cantidad: string, precioUnitario: string) => ({
+  tipo: 'SERVICIO' as const,
+  cantidad: D(cantidad),
+  precioUnitario: D(precioUnitario),
+  costoUnitario: null,
 });
-const part = (quantity: string, unitPrice: string, unitCost: string) => ({
-  type: 'PRODUCT' as const,
-  quantity: D(quantity),
-  unitPrice: D(unitPrice),
-  unitCost: D(unitCost),
+const part = (
+  cantidad: string,
+  precioUnitario: string,
+  costoUnitario: string,
+) => ({
+  tipo: 'PRODUCTO' as const,
+  cantidad: D(cantidad),
+  precioUnitario: D(precioUnitario),
+  costoUnitario: D(costoUnitario),
 });
 
 describe('itemSubtotal', () => {
@@ -29,7 +33,7 @@ describe('itemSubtotal', () => {
 });
 
 describe('workOrderAmounts', () => {
-  it('sin ítems, todo en cero', () => {
+  it('sin detalles, todo en cero', () => {
     const amounts = workOrderAmounts([]);
     expect(Object.values(amounts).map((amount) => amount.toFixed(2))).toEqual([
       '0.00',
@@ -47,13 +51,13 @@ describe('workOrderAmounts', () => {
       part('4.5', '38.90', '22.35'),
       part('1', '15.00', '9.80'),
     ]);
-    expect(amounts.labor.toFixed(2)).toBe('0.50');
+    expect(amounts.manoObra.toFixed(2)).toBe('0.50');
     // 4.5 × 38.90 = 175.05; más 15.00
-    expect(amounts.parts.toFixed(2)).toBe('190.05');
+    expect(amounts.repuestos.toFixed(2)).toBe('190.05');
     expect(amounts.total.toFixed(2)).toBe('190.55');
     // 4.5 × 22.35 = 100.575 → 100.58; más 9.80
-    expect(amounts.partsCost.toFixed(2)).toBe('110.38');
-    expect(amounts.partsMargin.toFixed(2)).toBe('79.67');
+    expect(amounts.costoRepuestos.toFixed(2)).toBe('110.38');
+    expect(amounts.margenRepuestos.toFixed(2)).toBe('79.67');
   });
 
   it('suma los subtotales ya redondeados, para cuadrar con cada línea', () => {
@@ -63,15 +67,15 @@ describe('workOrderAmounts', () => {
       service('0.5', '0.01'),
       service('0.5', '0.01'),
     ]);
-    expect(amounts.labor.toFixed(2)).toBe('0.03');
+    expect(amounts.manoObra.toFixed(2)).toBe('0.03');
   });
 
   it('un servicio no suma costo, y un repuesto sin costo cuesta 0', () => {
     const amounts = workOrderAmounts([
       service('1', '100'),
-      { ...part('2', '10', '0'), unitCost: null },
+      { ...part('2', '10', '0'), costoUnitario: null },
     ]);
-    expect(amounts.partsCost.toFixed(2)).toBe('0.00');
-    expect(amounts.partsMargin.toFixed(2)).toBe('20.00');
+    expect(amounts.costoRepuestos.toFixed(2)).toBe('0.00');
+    expect(amounts.margenRepuestos.toFixed(2)).toBe('20.00');
   });
 });

@@ -13,37 +13,41 @@ import {
   IsMovementQuantity,
   ToQuantityText,
 } from '../../../../core/validation/quantity.js';
-import { ItemType } from '../../../../generated/prisma/enums.js';
+import { TipoDetalle } from '../../../../generated/prisma/enums.js';
 
-/** Lo que mide la columna `description` del ítem. */
+/** Lo que mide la columna `descripcion` del detalle. */
 export const ITEM_DESCRIPTION_MAX_LENGTH = 200;
 
 /**
- * Un servicio o un repuesto que se agrega a la orden. Según `type` se elige
- * del catálogo (`serviceCatalogItemId`) o del inventario (`productId`); que no
+ * Un servicio o un repuesto que se agrega a la orden. Según `tipo` se elige
+ * del catálogo (`servicioId`) o del inventario (`productoId`); que no
  * lleve los dos lo valida el service. La descripción y el precio se copian del
  * original: el administrador puede mandar los suyos, el mecánico no.
  */
 export class CreateWorkOrderItemDto {
-  @ApiProperty({ enum: ItemType, enumName: 'ItemType' })
-  @IsEnum(ItemType, { message: 'El tipo de ítem es SERVICE o PRODUCT' })
-  type: ItemType;
+  @ApiProperty({ enum: TipoDetalle, enumName: 'TipoDetalle' })
+  @IsEnum(TipoDetalle, { message: 'El tipo de detalle es SERVICIO o PRODUCTO' })
+  tipo: TipoDetalle;
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'Obligatorio si type es SERVICE',
+    description: 'Obligatorio si tipo es SERVICIO',
   })
-  @ValidateIf((dto: CreateWorkOrderItemDto) => dto.type === ItemType.SERVICE)
+  @ValidateIf(
+    (dto: CreateWorkOrderItemDto) => dto.tipo === TipoDetalle.SERVICIO,
+  )
   @IsUUID('4', { message: 'Selecciona el servicio' })
-  serviceCatalogItemId?: string;
+  servicioId?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'Obligatorio si type es PRODUCT',
+    description: 'Obligatorio si tipo es PRODUCTO',
   })
-  @ValidateIf((dto: CreateWorkOrderItemDto) => dto.type === ItemType.PRODUCT)
+  @ValidateIf(
+    (dto: CreateWorkOrderItemDto) => dto.tipo === TipoDetalle.PRODUCTO,
+  )
   @IsUUID('4', { message: 'Selecciona el repuesto' })
-  productId?: string;
+  productoId?: string;
 
   @ApiPropertyOptional({
     oneOf: [
@@ -60,7 +64,7 @@ export class CreateWorkOrderItemDto {
   @ValidateIf((_dto: unknown, value: unknown) => value !== undefined)
   @ToQuantityText()
   @IsMovementQuantity('La cantidad', { signed: false })
-  quantity?: string;
+  cantidad?: string;
 
   @ApiPropertyOptional({
     oneOf: [
@@ -68,17 +72,17 @@ export class CreateWorkOrderItemDto {
       { type: 'number', example: 35 },
     ],
     description:
-      'Solo ADMIN. Precio unitario en soles; sin él, se copia el del catálogo o el del repuesto',
+      'Solo ADMINISTRADOR. Precio unitario en soles; sin él, se copia el del catálogo o el del repuesto',
   })
   @ValidateIf((_dto: unknown, value: unknown) => value !== undefined)
   @ToMoneyText()
   @IsMoney('El precio unitario')
-  unitPrice?: string;
+  precioUnitario?: string;
 
   @ApiPropertyOptional({
     maxLength: ITEM_DESCRIPTION_MAX_LENGTH,
     description:
-      'Solo ADMIN. Sin ella, se copia el nombre del servicio o «código · nombre» del repuesto',
+      'Solo ADMINISTRADOR. Sin ella, se copia el nombre del servicio o «código · nombre» del repuesto',
   })
   @ValidateIf((_dto: unknown, value: unknown) => value !== undefined)
   @Transform(({ value }: { value: unknown }) =>
@@ -87,7 +91,7 @@ export class CreateWorkOrderItemDto {
   @MaxLength(ITEM_DESCRIPTION_MAX_LENGTH, {
     message: `La descripción tiene como máximo ${ITEM_DESCRIPTION_MAX_LENGTH} caracteres`,
   })
-  @IsNotEmpty({ message: 'Escribe la descripción del ítem' })
-  @IsString({ message: 'Escribe la descripción del ítem' })
-  description?: string;
+  @IsNotEmpty({ message: 'Escribe la descripción del detalle' })
+  @IsString({ message: 'Escribe la descripción del detalle' })
+  descripcion?: string;
 }

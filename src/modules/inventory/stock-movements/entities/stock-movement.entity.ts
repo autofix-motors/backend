@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { StockMovement as StockMovementModel } from '../../../../generated/prisma/client.js';
-import { StockMovementType } from '../../../../generated/prisma/enums.js';
+import type { MovimientoStock as StockMovementModel } from '../../../../generated/prisma/client.js';
+import { TipoMovimiento } from '../../../../generated/prisma/enums.js';
 import {
   StockMovementProduct,
   type StockMovementProductModel,
@@ -11,14 +11,14 @@ import {
 } from './stock-movement-user.entity.js';
 
 export type StockMovementWithRelations = StockMovementModel & {
-  product: StockMovementProductModel;
-  createdBy: StockMovementUserModel;
+  producto: StockMovementProductModel;
+  creadoPor: StockMovementUserModel;
 };
 
 /**
  * Lo que sale de un movimiento de stock por la API: una línea del kardex.
  *
- * El costo unitario solo se copia con `includeCosts` (el administrador): el
+ * El costo unitario solo se copia con `incluirCostos` (el administrador): el
  * mecánico consulta el kardex pero no ve costos, igual que en los productos.
  * No hay stock resultante («saldo») porque no se guarda: calcularlo por fila
  * exigiría recorrer todo el kardex anterior del producto en cada página.
@@ -26,66 +26,66 @@ export type StockMovementWithRelations = StockMovementModel & {
 export class StockMovement {
   constructor(
     movement: StockMovementWithRelations,
-    { includeCosts }: { includeCosts: boolean },
+    { incluirCostos }: { incluirCostos: boolean },
   ) {
-    this.stockMovementId = movement.stockMovementId;
-    this.type = movement.type;
+    this.movimientoStockId = movement.movimientoStockId;
+    this.tipo = movement.tipo;
     // Texto con dos decimales y su signo: «-2.00» es una salida.
-    this.quantity = movement.quantity.toFixed(2);
-    if (includeCosts) {
-      this.unitCost = movement.unitCost?.toFixed(2) ?? null;
+    this.cantidad = movement.cantidad.toFixed(2);
+    if (incluirCostos) {
+      this.costoUnitario = movement.costoUnitario?.toFixed(2) ?? null;
     }
-    this.note = movement.note;
-    this.workOrderItemId = movement.workOrderItemId;
-    this.product = new StockMovementProduct(movement.product);
-    this.createdBy = new StockMovementUser(movement.createdBy);
-    this.createdAt = movement.createdAt;
+    this.nota = movement.nota;
+    this.detalleOrdenId = movement.detalleOrdenId;
+    this.producto = new StockMovementProduct(movement.producto);
+    this.creadoPor = new StockMovementUser(movement.creadoPor);
+    this.creadoEn = movement.creadoEn;
   }
 
   @ApiProperty({ format: 'uuid' })
-  stockMovementId: string;
+  movimientoStockId: string;
 
-  @ApiProperty({ enum: StockMovementType, enumName: 'StockMovementType' })
-  type: StockMovementType;
+  @ApiProperty({ enum: TipoMovimiento, enumName: 'TipoMovimiento' })
+  tipo: TipoMovimiento;
 
   @ApiProperty({
     example: '-2.00',
     description:
       'Con signo, en la unidad del producto: positiva entra y negativa sale',
   })
-  quantity: string;
+  cantidad: string;
 
   @ApiPropertyOptional({
     type: String,
     nullable: true,
     example: '18.50',
     description:
-      'Costo unitario en soles: el de la compra, o el del producto al momento de un ajuste o un consumo. Solo para ADMIN',
+      'Costo unitario en soles: el de la compra, o el del producto al momento de un ajuste o un consumo. Solo para ADMINISTRADOR',
   })
-  unitCost?: string | null;
+  costoUnitario?: string | null;
 
   @ApiProperty({
     type: String,
     nullable: true,
     example: 'Inventario físico de fin de mes',
   })
-  note: string | null;
+  nota: string | null;
 
   @ApiProperty({
     type: String,
     nullable: true,
     format: 'uuid',
     description:
-      'El ítem de la orden de trabajo que generó la salida. Solo en WORK_ORDER; vacío si el ítem se quitó de la orden',
+      'El detalle de la orden de trabajo que generó la salida. Solo en ORDEN_TRABAJO; vacío si el detalle se quitó de la orden',
   })
-  workOrderItemId: string | null;
+  detalleOrdenId: string | null;
 
   @ApiProperty({ type: StockMovementProduct })
-  product: StockMovementProduct;
+  producto: StockMovementProduct;
 
   @ApiProperty({ type: StockMovementUser, description: 'Quién lo registró' })
-  createdBy: StockMovementUser;
+  creadoPor: StockMovementUser;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 }

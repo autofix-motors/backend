@@ -20,7 +20,7 @@ export class LoginDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa tu documento o correo' })
-  identifier: string;
+  identificador: string;
 
   @ApiProperty({ format: 'password' })
   // Tope para que nadie mande una contraseña de megabytes: argon2 la procesaría
@@ -28,5 +28,5 @@ export class LoginDto {
   @MaxLength(200, { message: 'La contraseña es demasiado larga' })
   @MinLength(1, { message: 'Ingresa la contraseña' })
   @IsString({ message: 'Ingresa la contraseña' })
-  password: string;
+  contrasena: string;
 }

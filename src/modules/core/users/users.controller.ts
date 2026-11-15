@@ -21,7 +21,7 @@ import type { SessionUser } from '../../../core/auth/session-user.js';
 import { CurrentUser } from '../../../core/decorators/current-user.decorator.js';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -37,7 +37,7 @@ import { UsersService } from './users.service.js';
 
 /** El personal del taller: quienes inician sesión. Solo el administrador. */
 @ApiTags('users')
-@Roles(UserRole.ADMIN)
+@Roles(RolUsuario.ADMINISTRADOR)
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}

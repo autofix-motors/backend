@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Product as ProductModel } from '../../../../generated/prisma/client.js';
-import { UnitOfMeasure } from '../../../../generated/prisma/enums.js';
+import type { Producto as ProductModel } from '../../../../generated/prisma/client.js';
+import { UnidadMedida } from '../../../../generated/prisma/enums.js';
 
 export type StockMovementProductModel = Pick<
   ProductModel,
-  'productId' | 'code' | 'name' | 'unit'
+  'productoId' | 'codigo' | 'nombre' | 'unidad'
 >;
 
 /**
@@ -13,21 +13,21 @@ export type StockMovementProductModel = Pick<
  */
 export class StockMovementProduct {
   constructor(product: StockMovementProductModel) {
-    this.productId = product.productId;
-    this.code = product.code;
-    this.name = product.name;
-    this.unit = product.unit;
+    this.productoId = product.productoId;
+    this.codigo = product.codigo;
+    this.nombre = product.nombre;
+    this.unidad = product.unidad;
   }
 
   @ApiProperty({ format: 'uuid' })
-  productId: string;
+  productoId: string;
 
   @ApiProperty({ example: 'FA-TOY-90915' })
-  code: string;
+  codigo: string;
 
   @ApiProperty({ example: 'Filtro de aceite Toyota Yaris' })
-  name: string;
+  nombre: string;
 
-  @ApiProperty({ enum: UnitOfMeasure, enumName: 'UnitOfMeasure' })
-  unit: UnitOfMeasure;
+  @ApiProperty({ enum: UnidadMedida, enumName: 'UnidadMedida' })
+  unidad: UnidadMedida;
 }

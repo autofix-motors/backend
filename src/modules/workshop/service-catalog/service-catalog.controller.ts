@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import {
   ApiBaseResponse,
@@ -41,7 +41,7 @@ export class ServiceCatalogController {
   constructor(private readonly serviceCatalog: ServiceCatalogService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiPaginatedResponse(ServiceCatalogItem)
   @ApiBadRequestResponse({
     description: 'El precio mínimo es mayor que el máximo',
@@ -59,22 +59,20 @@ export class ServiceCatalogController {
   }
 
   @Get(':serviceCatalogItemId')
-  @Roles(UserRole.ADMIN, UserRole.MECHANIC)
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.MECANICO)
   @ApiBaseResponse(ServiceCatalogItem)
   @ApiNotFoundResponse({ description: 'No se encontró el servicio' })
   async findOne(
-    @Param('serviceCatalogItemId', ParseIdPipe) serviceCatalogItemId: string,
+    @Param('serviceCatalogItemId', ParseIdPipe) servicioId: string,
   ): Promise<BaseResponseDto<ServiceCatalogItem>> {
     return BaseResponseDto.success(
-      new ServiceCatalogItem(
-        await this.serviceCatalog.findOne(serviceCatalogItemId),
-      ),
+      new ServiceCatalogItem(await this.serviceCatalog.findOne(servicioId)),
       'Servicio obtenido',
     );
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(ServiceCatalogItem, { status: HttpStatus.CREATED })
   @ApiConflictResponse({ description: 'Ya existe un servicio con ese nombre' })
   async create(
@@ -88,24 +86,22 @@ export class ServiceCatalogController {
   }
 
   @Patch(':serviceCatalogItemId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @ApiBaseResponse(ServiceCatalogItem)
   @ApiNotFoundResponse({ description: 'No se encontró el servicio' })
   @ApiConflictResponse({ description: 'Ya existe un servicio con ese nombre' })
   async update(
-    @Param('serviceCatalogItemId', ParseIdPipe) serviceCatalogItemId: string,
+    @Param('serviceCatalogItemId', ParseIdPipe) servicioId: string,
     @Body() dto: UpdateServiceCatalogItemDto,
   ): Promise<BaseResponseDto<ServiceCatalogItem>> {
     return BaseResponseDto.success(
-      new ServiceCatalogItem(
-        await this.serviceCatalog.update(serviceCatalogItemId, dto),
-      ),
+      new ServiceCatalogItem(await this.serviceCatalog.update(servicioId, dto)),
       'Servicio actualizado',
     );
   }
 
   @Delete(':serviceCatalogItemId')
-  @Roles(UserRole.ADMIN)
+  @Roles(RolUsuario.ADMINISTRADOR)
   @HttpCode(HttpStatus.OK)
   @ApiBaseResponse(null, { description: 'Servicio eliminado' })
   @ApiNotFoundResponse({ description: 'No se encontró el servicio' })
@@ -113,9 +109,9 @@ export class ServiceCatalogController {
     description: 'El servicio ya se usó en órdenes de trabajo',
   })
   async remove(
-    @Param('serviceCatalogItemId', ParseIdPipe) serviceCatalogItemId: string,
+    @Param('serviceCatalogItemId', ParseIdPipe) servicioId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.serviceCatalog.remove(serviceCatalogItemId);
+    await this.serviceCatalog.remove(servicioId);
     return BaseResponseDto.success(null, 'Servicio eliminado');
   }
 }

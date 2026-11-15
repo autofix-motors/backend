@@ -10,11 +10,11 @@ import type { RequestWithSession } from '../auth/session-user.js';
 @Injectable()
 export class PasswordThrottlerGuard extends ThrottlerGuard {
   protected override getTracker(req: Record<string, any>): Promise<string> {
-    const { user, customer } = req as RequestWithSession;
-    const owner = user
-      ? `user:${user.userId}`
-      : customer
-        ? `customer:${customer.customerId}`
+    const { usuario, cliente } = req as RequestWithSession;
+    const owner = usuario
+      ? `usuario:${usuario.usuarioId}`
+      : cliente
+        ? `cliente:${cliente.clienteId}`
         : `ip:${String(req.ip)}`;
     return Promise.resolve(owner);
   }

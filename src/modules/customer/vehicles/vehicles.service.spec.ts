@@ -17,34 +17,34 @@ import {
 // un vehículo y que un vehículo con historial no se borre.
 
 const valid = {
-  customerId: 'c1',
-  plate: 'ABC123',
-  brand: 'Toyota',
-  model: 'Yaris',
+  clienteId: 'c1',
+  placa: 'ABC123',
+  marca: 'Toyota',
+  modelo: 'Yaris',
 };
 
 describe('vehiclesWhere', () => {
   it('sin búsqueda ni filtros no restringe nada', () => {
     expect(vehiclesWhere({})).toEqual({
-      customerId: undefined,
-      brand: undefined,
+      clienteId: undefined,
+      marca: undefined,
     });
   });
 
   it('filtra por cliente y por marca exacta sin distinguir mayúsculas', () => {
-    expect(vehiclesWhere({ customerId: 'c1', brand: 'toyota' })).toEqual({
-      customerId: 'c1',
-      brand: { equals: 'toyota', mode: 'insensitive' },
+    expect(vehiclesWhere({ clienteId: 'c1', marca: 'toyota' })).toEqual({
+      clienteId: 'c1',
+      marca: { equals: 'toyota', mode: 'insensitive' },
     });
   });
 
   it('busca en la placa normalizada, la marca, el modelo y el cliente', () => {
     const text = { contains: 'abc-1', mode: 'insensitive' };
     expect(vehiclesWhere({ search: 'abc-1' }).OR).toEqual([
-      { plate: { contains: 'ABC1' } },
-      { brand: text },
-      { model: text },
-      { customer: { name: text } },
+      { placa: { contains: 'ABC1' } },
+      { marca: text },
+      { modelo: text },
+      { cliente: { nombre: text } },
     ]);
   });
 
@@ -52,7 +52,7 @@ describe('vehiclesWhere', () => {
     const conditions = vehiclesWhere({ search: '-' }).OR ?? [];
     expect(conditions).toHaveLength(3);
     expect(conditions).not.toContainEqual(
-      expect.objectContaining({ plate: expect.anything() }),
+      expect.objectContaining({ placa: expect.anything() }),
     );
   });
 });
@@ -61,13 +61,13 @@ describe('mergeBrands', () => {
   it('junta la misma marca con distintas mayúsculas y ordena', () => {
     expect(
       mergeBrands([
-        { brand: 'TOYOTA', vehiclesCount: 1 },
-        { brand: 'Kia', vehiclesCount: 2 },
-        { brand: 'Toyota', vehiclesCount: 4 },
+        { marca: 'TOYOTA', cantidadVehiculos: 1 },
+        { marca: 'Kia', cantidadVehiculos: 2 },
+        { marca: 'Toyota', cantidadVehiculos: 4 },
       ]),
     ).toEqual([
-      { brand: 'Kia', vehiclesCount: 2 },
-      { brand: 'Toyota', vehiclesCount: 5 },
+      { marca: 'Kia', cantidadVehiculos: 2 },
+      { marca: 'Toyota', cantidadVehiculos: 5 },
     ]);
   });
 });
@@ -75,7 +75,7 @@ describe('mergeBrands', () => {
 describe('VehiclesService', () => {
   const prisma = {
     $transaction: vi.fn((queries: unknown[]) => Promise.all(queries)),
-    vehicle: {
+    vehiculo: {
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
@@ -92,25 +92,25 @@ describe('VehiclesService', () => {
   );
 
   beforeEach(() => {
-    customers.findOne.mockResolvedValue({ customerId: 'c1', isActive: true });
-    prisma.vehicle.findFirst.mockResolvedValue(null);
+    customers.findOne.mockResolvedValue({ clienteId: 'c1', activo: true });
+    prisma.vehiculo.findFirst.mockResolvedValue(null);
   });
   afterEach(() => vi.clearAllMocks());
 
   it('pagina y desempata el orden por el id', async () => {
-    prisma.vehicle.findMany.mockResolvedValue([]);
-    prisma.vehicle.count.mockResolvedValue(31);
+    prisma.vehiculo.findMany.mockResolvedValue([]);
+    prisma.vehiculo.count.mockResolvedValue(31);
 
     const page = await service.findAll({
       page: 2,
       pageSize: 10,
-      sortBy: 'brand',
-      sortOrder: 'desc',
+      ordenarPor: 'marca',
+      sentido: 'desc',
     });
 
-    expect(prisma.vehicle.findMany).toHaveBeenCalledWith(
+    expect(prisma.vehiculo.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: [{ brand: 'desc' }, { vehicleId: 'asc' }],
+        orderBy: [{ marca: 'desc' }, { vehiculoId: 'asc' }],
         skip: 10,
         take: 10,
       }),
@@ -119,13 +119,13 @@ describe('VehiclesService', () => {
   });
 
   it('no registra un vehículo a un cliente inactivo', async () => {
-    customers.findOne.mockResolvedValue({ customerId: 'c1', isActive: false });
+    customers.findOne.mockResolvedValue({ clienteId: 'c1', activo: false });
     await expect(service.create(valid)).rejects.toThrow(
       new BadRequestException(
         'El cliente está inactivo: actívalo antes de asignarle un vehículo',
       ),
     );
-    expect(prisma.vehicle.create).not.toHaveBeenCalled();
+    expect(prisma.vehiculo.create).not.toHaveBeenCalled();
   });
 
   it('responde 404 si el cliente no existe', async () => {
@@ -133,11 +133,11 @@ describe('VehiclesService', () => {
       new NotFoundException('No se encontró el cliente'),
     );
     await expect(service.create(valid)).rejects.toThrow(NotFoundException);
-    expect(prisma.vehicle.create).not.toHaveBeenCalled();
+    expect(prisma.vehiculo.create).not.toHaveBeenCalled();
   });
 
   it('dice si lo repetido es la placa', async () => {
-    prisma.vehicle.findFirst.mockResolvedValue({ plate: 'ABC123' });
+    prisma.vehiculo.findFirst.mockResolvedValue({ placa: 'ABC123' });
     await expect(
       service.create({ ...valid, vin: 'JTDBT923771234567' }),
     ).rejects.toThrow(
@@ -146,7 +146,7 @@ describe('VehiclesService', () => {
   });
 
   it('dice si lo repetido es el VIN', async () => {
-    prisma.vehicle.findFirst.mockResolvedValue({ plate: 'XYZ789' });
+    prisma.vehiculo.findFirst.mockResolvedValue({ placa: 'XYZ789' });
     await expect(
       service.create({ ...valid, vin: 'JTDBT923771234567' }),
     ).rejects.toThrow(
@@ -155,17 +155,17 @@ describe('VehiclesService', () => {
   });
 
   it('al editar, la placa propia no cuenta como repetida', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue({ customerId: 'c1' });
-    await service.update('v1', { plate: 'ABC123' });
-    expect(prisma.vehicle.findFirst).toHaveBeenCalledWith({
-      where: { OR: [{ plate: 'ABC123' }], NOT: { vehicleId: 'v1' } },
-      select: { plate: true },
+    prisma.vehiculo.findUnique.mockResolvedValue({ clienteId: 'c1' });
+    await service.update('v1', { placa: 'ABC123' });
+    expect(prisma.vehiculo.findFirst).toHaveBeenCalledWith({
+      where: { OR: [{ placa: 'ABC123' }], NOT: { vehiculoId: 'v1' } },
+      select: { placa: true },
     });
-    expect(prisma.vehicle.update).toHaveBeenCalled();
+    expect(prisma.vehiculo.update).toHaveBeenCalled();
   });
 
   it('traduce una placa repetida a la vez por otra alta a un 409', async () => {
-    prisma.vehicle.create.mockRejectedValue(
+    prisma.vehiculo.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicado', {
         code: 'P2002',
         clientVersion: 'test',
@@ -177,47 +177,47 @@ describe('VehiclesService', () => {
   });
 
   it('al editar sin cambiar de dueño no verifica al cliente', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue({ customerId: 'c1' });
-    await service.update('v1', { customerId: 'c1', color: 'Rojo' });
+    prisma.vehiculo.findUnique.mockResolvedValue({ clienteId: 'c1' });
+    await service.update('v1', { clienteId: 'c1', color: 'Rojo' });
     expect(customers.findOne).not.toHaveBeenCalled();
   });
 
   it('no traspasa un vehículo a un cliente inactivo', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue({ customerId: 'c1' });
-    customers.findOne.mockResolvedValue({ customerId: 'c2', isActive: false });
-    await expect(service.update('v1', { customerId: 'c2' })).rejects.toThrow(
+    prisma.vehiculo.findUnique.mockResolvedValue({ clienteId: 'c1' });
+    customers.findOne.mockResolvedValue({ clienteId: 'c2', activo: false });
+    await expect(service.update('v1', { clienteId: 'c2' })).rejects.toThrow(
       BadRequestException,
     );
-    expect(prisma.vehicle.update).not.toHaveBeenCalled();
+    expect(prisma.vehiculo.update).not.toHaveBeenCalled();
   });
 
   it('no borra un vehículo con órdenes de trabajo, y dice por qué', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue({ _count: { workOrders: 3 } });
+    prisma.vehiculo.findUnique.mockResolvedValue({ _count: { ordenes: 3 } });
     await expect(service.remove('v1')).rejects.toThrow(
       new ConflictException(
         'No se puede eliminar: el vehículo tiene 3 órdenes de trabajo en su historial',
       ),
     );
-    expect(prisma.vehicle.delete).not.toHaveBeenCalled();
+    expect(prisma.vehiculo.delete).not.toHaveBeenCalled();
   });
 
   it('borra de verdad un vehículo sin historial', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue({ _count: { workOrders: 0 } });
+    prisma.vehiculo.findUnique.mockResolvedValue({ _count: { ordenes: 0 } });
     await service.remove('v1');
-    expect(prisma.vehicle.delete).toHaveBeenCalledWith({
-      where: { vehicleId: 'v1' },
+    expect(prisma.vehiculo.delete).toHaveBeenCalledWith({
+      where: { vehiculoId: 'v1' },
     });
   });
 
   it('responde 404 al borrar un vehículo que no existe', async () => {
-    prisma.vehicle.findUnique.mockResolvedValue(null);
+    prisma.vehiculo.findUnique.mockResolvedValue(null);
     await expect(service.remove('v1')).rejects.toThrow(NotFoundException);
   });
 
   describe('portal del cliente', () => {
     it('pagina solo los vehículos del cliente, con la búsqueda del personal', async () => {
-      prisma.vehicle.findMany.mockResolvedValue([]);
-      prisma.vehicle.count.mockResolvedValue(10);
+      prisma.vehiculo.findMany.mockResolvedValue([]);
+      prisma.vehiculo.count.mockResolvedValue(10);
 
       const page = await service.findForCustomer('c1', {
         search: 'abc-1',
@@ -225,38 +225,38 @@ describe('VehiclesService', () => {
         pageSize: 9,
       });
 
-      const where = vehiclesWhere({ customerId: 'c1', search: 'abc-1' });
-      expect(prisma.vehicle.findMany).toHaveBeenCalledWith(
+      const where = vehiclesWhere({ clienteId: 'c1', search: 'abc-1' });
+      expect(prisma.vehiculo.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where,
-          orderBy: [{ plate: 'asc' }, { vehicleId: 'asc' }],
+          orderBy: [{ placa: 'asc' }, { vehiculoId: 'asc' }],
           skip: 9,
           take: 9,
         }),
       );
-      expect(prisma.vehicle.count).toHaveBeenCalledWith({ where });
+      expect(prisma.vehiculo.count).toHaveBeenCalledWith({ where });
       expect(page.meta.totalPages).toBe(2);
     });
 
     it('sin búsqueda, igual filtra por el cliente', async () => {
-      prisma.vehicle.findMany.mockResolvedValue([]);
-      prisma.vehicle.count.mockResolvedValue(0);
+      prisma.vehiculo.findMany.mockResolvedValue([]);
+      prisma.vehiculo.count.mockResolvedValue(0);
       await service.findForCustomer('c1', { page: 1, pageSize: 9 });
-      expect(prisma.vehicle.findMany).toHaveBeenCalledWith(
+      expect(prisma.vehiculo.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ customerId: 'c1' }),
+          where: expect.objectContaining({ clienteId: 'c1' }),
         }),
       );
     });
 
     it('un vehículo de otro cliente responde 404', async () => {
-      prisma.vehicle.findFirst.mockResolvedValue(null);
+      prisma.vehiculo.findFirst.mockResolvedValue(null);
       await expect(service.findOneForCustomer('v1', 'c1')).rejects.toThrow(
         NotFoundException,
       );
-      expect(prisma.vehicle.findFirst).toHaveBeenCalledWith(
+      expect(prisma.vehiculo.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { vehicleId: 'v1', customerId: 'c1' },
+          where: { vehiculoId: 'v1', clienteId: 'c1' },
         }),
       );
     });

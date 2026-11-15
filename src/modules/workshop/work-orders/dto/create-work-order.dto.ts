@@ -18,7 +18,7 @@ export const MAX_MILEAGE = 9_999_999;
 export class CreateWorkOrderDto {
   @ApiProperty({ format: 'uuid', description: 'El vehículo que ingresa' })
   @IsUUID('4', { message: 'Selecciona el vehículo' })
-  vehicleId: string;
+  vehiculoId: string;
 
   @ApiProperty({ example: 84500, minimum: 0, maximum: MAX_MILEAGE })
   @Max(MAX_MILEAGE, { message: 'El kilometraje es como máximo 9 999 999' })
@@ -26,7 +26,7 @@ export class CreateWorkOrderDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsInt({ message: 'El kilometraje es un número entero de km' })
-  mileageIn: number;
+  kilometrajeIngreso: number;
 
   @ApiProperty({
     example: 'Ruido al frenar y vibración en el timón',
@@ -38,7 +38,7 @@ export class CreateWorkOrderDto {
   @MaxLength(2000, { message: 'El motivo tiene como máximo 2000 caracteres' })
   @IsNotEmpty({ message: 'Ingresa el motivo del ingreso' })
   @IsString({ message: 'Ingresa el motivo del ingreso' })
-  reason: string;
+  motivo: string;
 
   @ApiPropertyOptional({
     type: String,
@@ -50,7 +50,7 @@ export class CreateWorkOrderDto {
   })
   @IsOptional()
   @IsDateOnly('La fecha prometida')
-  promisedDate?: string | null;
+  fechaPrometida?: string | null;
 
   @ApiPropertyOptional({
     type: String,
@@ -60,5 +60,5 @@ export class CreateWorkOrderDto {
   })
   @IsOptional()
   @IsUUID('4', { message: 'El mecánico no es válido' })
-  mechanicId?: string | null;
+  mecanicoId?: string | null;
 }

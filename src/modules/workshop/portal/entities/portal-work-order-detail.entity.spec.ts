@@ -9,115 +9,115 @@ import { PortalWorkOrder } from './portal-work-order.entity.js';
 // personal no puede colarse en el portal sin que esta prueba falle.
 
 const D = (value: string) => new Prisma.Decimal(value);
-const STAFF = { userId: 'admin-1', name: 'Ana Admin' };
+const STAFF = { usuarioId: 'admin-1', nombre: 'Ana Admin' };
 
 function order(overrides: Record<string, unknown> = {}) {
   return {
-    workOrderId: 'wo-1',
-    number: 123,
-    trackingCode: 'AFM-7K3Q9X',
-    customerId: 'cust-1',
-    vehicleId: 'veh-1',
-    mechanicId: 'mech-1',
-    createdById: 'admin-1',
-    status: 'WAITING_APPROVAL',
-    mileageIn: 85000,
-    reason: 'Ruido al frenar',
-    diagnosis: 'Pastillas gastadas',
-    promisedDate: new Date('2026-10-20T00:00:00.000Z'),
-    receivedAt: new Date('2026-10-18T14:00:00.000Z'),
-    deliveredAt: null,
-    cancelledAt: null,
-    cancelReason: null,
-    createdAt: new Date('2026-10-18T14:00:00.000Z'),
-    updatedAt: new Date('2026-10-18T14:00:00.000Z'),
-    vehicle: {
-      vehicleId: 'veh-1',
-      plate: 'ABC123',
-      brand: 'Toyota',
-      model: 'Yaris',
+    ordenTrabajoId: 'wo-1',
+    numero: 123,
+    codigoSeguimiento: 'AFM-7K3Q9X',
+    clienteId: 'cust-1',
+    vehiculoId: 'veh-1',
+    mecanicoId: 'mech-1',
+    creadoPorId: 'admin-1',
+    estado: 'ESPERANDO_APROBACION',
+    kilometrajeIngreso: 85000,
+    motivo: 'Ruido al frenar',
+    diagnostico: 'Pastillas gastadas',
+    fechaPrometida: new Date('2026-10-20T00:00:00.000Z'),
+    recibidaEn: new Date('2026-10-18T14:00:00.000Z'),
+    entregadaEn: null,
+    canceladaEn: null,
+    motivoCancelacion: null,
+    creadoEn: new Date('2026-10-18T14:00:00.000Z'),
+    actualizadoEn: new Date('2026-10-18T14:00:00.000Z'),
+    vehiculo: {
+      vehiculoId: 'veh-1',
+      placa: 'ABC123',
+      marca: 'Toyota',
+      modelo: 'Yaris',
     },
-    customer: { customerId: 'cust-1', name: 'Juan', phone: '987654321' },
-    mechanic: { userId: 'mech-1', name: 'Mario Mecánico' },
-    createdBy: STAFF,
-    items: [
+    cliente: { clienteId: 'cust-1', nombre: 'Juan', telefono: '987654321' },
+    mecanico: { usuarioId: 'mech-1', nombre: 'Mario Mecánico' },
+    creadoPor: STAFF,
+    detalles: [
       {
-        workOrderItemId: 'item-1',
-        workOrderId: 'wo-1',
-        type: 'SERVICE',
-        serviceCatalogItemId: 'svc-1',
-        productId: null,
-        description: 'Cambio de pastillas de freno (por eje)',
-        quantity: D('1'),
-        unitPrice: D('80'),
-        unitCost: null,
-        product: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        detalleOrdenId: 'item-1',
+        ordenTrabajoId: 'wo-1',
+        tipo: 'SERVICIO',
+        servicioId: 'svc-1',
+        productoId: null,
+        descripcion: 'Cambio de pastillas de freno (por eje)',
+        cantidad: D('1'),
+        precioUnitario: D('80'),
+        costoUnitario: null,
+        producto: null,
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
       },
       {
-        workOrderItemId: 'item-2',
-        workOrderId: 'wo-1',
-        type: 'PRODUCT',
-        serviceCatalogItemId: null,
-        productId: 'prod-1',
-        description: 'PAS-DEL-YARIS · Pastillas de freno delanteras',
-        quantity: D('1'),
-        unitPrice: D('120'),
-        unitCost: D('70'),
-        product: { unit: 'KIT' },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ],
-    events: [
-      {
-        workOrderEventId: 'ev-1',
-        workOrderId: 'wo-1',
-        status: 'RECEIVED',
-        note: 'Vehículo recibido en el taller',
-        isPublic: true,
-        createdById: 'admin-1',
-        createdBy: STAFF,
-        createdAt: new Date('2026-10-18T14:00:00.000Z'),
-      },
-      {
-        workOrderEventId: 'ev-2',
-        workOrderId: 'wo-1',
-        status: null,
-        note: 'El cliente discutió el precio',
-        isPublic: false,
-        createdById: 'admin-1',
-        createdBy: STAFF,
-        createdAt: new Date('2026-10-18T15:00:00.000Z'),
+        detalleOrdenId: 'item-2',
+        ordenTrabajoId: 'wo-1',
+        tipo: 'PRODUCTO',
+        servicioId: null,
+        productoId: 'prod-1',
+        descripcion: 'PAS-DEL-YARIS · Pastillas de freno delanteras',
+        cantidad: D('1'),
+        precioUnitario: D('120'),
+        costoUnitario: D('70'),
+        producto: { unidad: 'KIT' },
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
       },
     ],
-    quotes: [
+    eventos: [
       {
-        quoteId: 'q-1',
-        workOrderId: 'wo-1',
+        eventoOrdenId: 'ev-1',
+        ordenTrabajoId: 'wo-1',
+        estado: 'RECIBIDO',
+        nota: 'Vehículo recibido en el taller',
+        esPublico: true,
+        creadoPorId: 'admin-1',
+        creadoPor: STAFF,
+        creadoEn: new Date('2026-10-18T14:00:00.000Z'),
+      },
+      {
+        eventoOrdenId: 'ev-2',
+        ordenTrabajoId: 'wo-1',
+        estado: null,
+        nota: 'El cliente discutió el precio',
+        esPublico: false,
+        creadoPorId: 'admin-1',
+        creadoPor: STAFF,
+        creadoEn: new Date('2026-10-18T15:00:00.000Z'),
+      },
+    ],
+    presupuestos: [
+      {
+        presupuestoId: 'q-1',
+        ordenTrabajoId: 'wo-1',
         version: 1,
-        status: 'PENDING',
+        estado: 'PENDIENTE',
         total: D('200'),
-        sentById: 'admin-1',
-        sentBy: STAFF,
-        sentAt: new Date('2026-10-18T15:30:00.000Z'),
-        decidedById: null,
-        decidedBy: null,
-        decidedAt: null,
-        decisionChannel: null,
-        decisionNote: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        items: [
+        enviadoPorId: 'admin-1',
+        enviadoPor: STAFF,
+        enviadoEn: new Date('2026-10-18T15:30:00.000Z'),
+        decididoPorId: null,
+        decididoPor: null,
+        decididoEn: null,
+        canalDecision: null,
+        notaDecision: null,
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
+        detalles: [
           {
-            quoteItemId: 'qi-1',
-            quoteId: 'q-1',
-            type: 'SERVICE',
-            description: 'Cambio de pastillas de freno (por eje)',
-            quantity: D('1'),
-            unitPrice: D('80'),
-            createdAt: new Date(),
+            detallePresupuestoId: 'qi-1',
+            presupuestoId: 'q-1',
+            tipo: 'SERVICIO',
+            descripcion: 'Cambio de pastillas de freno (por eje)',
+            cantidad: D('1'),
+            precioUnitario: D('80'),
+            creadoEn: new Date(),
           },
         ],
       },
@@ -134,95 +134,104 @@ describe('PortalWorkOrderDetail', () => {
 
     expect(keys(detail)).toEqual(
       [
-        'workOrderId',
-        'trackingCode',
-        'status',
-        'reason',
-        'vehicle',
-        'receivedAt',
-        'promisedDate',
-        'deliveredAt',
+        'ordenTrabajoId',
+        'codigoSeguimiento',
+        'estado',
+        'motivo',
+        'vehiculo',
+        'recibidaEn',
+        'fechaPrometida',
+        'entregadaEn',
         'total',
-        'hasPendingQuote',
-        'mileageIn',
-        'diagnosis',
-        'mechanicName',
-        'cancelReason',
-        'items',
-        'totals',
-        'events',
-        'quotes',
+        'tienePresupuestoPendiente',
+        'kilometrajeIngreso',
+        'diagnostico',
+        'nombreMecanico',
+        'motivoCancelacion',
+        'detalles',
+        'totales',
+        'eventos',
+        'presupuestos',
       ].sort(),
     );
-    expect(keys(detail.items[0])).toEqual(
+    expect(keys(detail.detalles[0])).toEqual(
       [
-        'type',
-        'description',
-        'quantity',
-        'unit',
-        'unitPrice',
+        'tipo',
+        'descripcion',
+        'cantidad',
+        'unidad',
+        'precioUnitario',
         'subtotal',
       ].sort(),
     );
-    expect(keys(detail.totals)).toEqual(['labor', 'parts', 'total'].sort());
-    expect(keys(detail.events[0])).toEqual(
-      ['status', 'note', 'createdAt'].sort(),
+    expect(keys(detail.totales)).toEqual(
+      ['manoObra', 'repuestos', 'total'].sort(),
     );
-    expect(keys(detail.quotes[0])).toEqual(
+    expect(keys(detail.eventos[0])).toEqual(
+      ['estado', 'nota', 'creadoEn'].sort(),
+    );
+    expect(keys(detail.presupuestos[0])).toEqual(
       [
-        'quoteId',
+        'presupuestoId',
         'version',
-        'status',
+        'estado',
         'total',
-        'sentAt',
-        'decidedAt',
-        'decisionChannel',
-        'decisionNote',
-        'items',
+        'enviadoEn',
+        'decididoEn',
+        'canalDecision',
+        'notaDecision',
+        'detalles',
       ].sort(),
     );
     expect(JSON.stringify(detail)).not.toMatch(
-      /unitCost|partsCost|partsMargin|"number"|admin-1|Ana Admin|svc-1|prod-1/,
+      /costoUnitario|costoRepuestos|margenRepuestos|"numero"|admin-1|Ana Admin|svc-1|prod-1/,
     );
   });
 
   it('muestra solo los eventos públicos', () => {
     const detail = new PortalWorkOrderDetail(order());
-    expect(detail.events).toEqual([
+    expect(detail.eventos).toEqual([
       {
-        status: 'RECEIVED',
-        note: 'Vehículo recibido en el taller',
-        createdAt: new Date('2026-10-18T14:00:00.000Z'),
+        estado: 'RECIBIDO',
+        nota: 'Vehículo recibido en el taller',
+        creadoEn: new Date('2026-10-18T14:00:00.000Z'),
       },
     ]);
   });
 
   it('trae el mecánico por su nombre, los montos y la unidad del repuesto', () => {
     const detail = new PortalWorkOrderDetail(order());
-    expect(detail.mechanicName).toBe('Mario Mecánico');
-    expect(detail.totals).toEqual({
-      labor: '80.00',
-      parts: '120.00',
+    expect(detail.nombreMecanico).toBe('Mario Mecánico');
+    expect(detail.totales).toEqual({
+      manoObra: '80.00',
+      repuestos: '120.00',
       total: '200.00',
     });
-    expect(detail.items[1]).toMatchObject({ unit: 'KIT', subtotal: '120.00' });
-    expect(detail.promisedDate).toBe('2026-10-20');
+    expect(detail.detalles[1]).toMatchObject({
+      unidad: 'KIT',
+      subtotal: '120.00',
+    });
+    expect(detail.fechaPrometida).toBe('2026-10-20');
   });
 
   it('avisa del presupuesto pendiente solo mientras la orden espera aprobación', () => {
-    expect(new PortalWorkOrderDetail(order()).hasPendingQuote).toBe(true);
+    expect(new PortalWorkOrderDetail(order()).tienePresupuestoPendiente).toBe(
+      true,
+    );
     expect(
-      new PortalWorkOrderDetail(order({ status: 'CANCELLED' })).hasPendingQuote,
+      new PortalWorkOrderDetail(order({ estado: 'CANCELADO' }))
+        .tienePresupuestoPendiente,
     ).toBe(false);
   });
 });
 
 describe('PortalWorkOrder (listado)', () => {
   it('con solo los ids de los presupuestos pendientes, también avisa', () => {
-    const row = order({ quotes: [{ quoteId: 'q-1' }] });
-    expect(new PortalWorkOrder(row).hasPendingQuote).toBe(true);
-    expect(new PortalWorkOrder({ ...row, quotes: [] }).hasPendingQuote).toBe(
-      false,
-    );
+    const row = order({ presupuestos: [{ presupuestoId: 'q-1' }] });
+    expect(new PortalWorkOrder(row).tienePresupuestoPendiente).toBe(true);
+    expect(
+      new PortalWorkOrder({ ...row, presupuestos: [] })
+        .tienePresupuestoPendiente,
+    ).toBe(false);
   });
 });

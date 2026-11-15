@@ -28,22 +28,22 @@ async function check<T extends object>(
 describe('CreateQuoteDto', () => {
   it('el cuerpo vacío vale: la nota es opcional y vacía queda en null', async () => {
     expect((await check(CreateQuoteDto, {})).messages).toEqual([]);
-    const { dto, messages } = await check(CreateQuoteDto, { note: '   ' });
+    const { dto, messages } = await check(CreateQuoteDto, { nota: '   ' });
     expect(messages).toEqual([]);
-    expect(dto.note).toBeNull();
+    expect(dto.nota).toBeNull();
   });
 
-  it('los ítems y el total no viajan: salen de la orden', async () => {
+  it('los detalles y el total no viajan: salen de la orden', async () => {
     expect(
-      (await check(CreateQuoteDto, { total: '1.00', items: [] })).messages,
-    ).toEqual(['no permitido: total', 'no permitido: items']);
+      (await check(CreateQuoteDto, { total: '1.00', detalles: [] })).messages,
+    ).toEqual(['no permitido: total', 'no permitido: detalles']);
   });
 
   it('la nota tiene como máximo 2000 caracteres y es texto', async () => {
     expect(
-      (await check(CreateQuoteDto, { note: 'x'.repeat(2001) })).messages,
+      (await check(CreateQuoteDto, { nota: 'x'.repeat(2001) })).messages,
     ).toEqual(['La nota tiene como máximo 2000 caracteres']);
-    expect((await check(CreateQuoteDto, { note: 5 })).messages).toEqual([
+    expect((await check(CreateQuoteDto, { nota: 5 })).messages).toEqual([
       'La nota tiene que ser texto',
     ]);
   });

@@ -14,21 +14,21 @@ async function errorsOf(body: Record<string, unknown>) {
 }
 
 const valid = {
-  customerId: '0b6f4a8e-3c1d-4e2f-9a7b-5c8d1e2f3a4b',
-  plate: 'ABC123',
-  brand: 'Toyota',
-  model: 'Yaris',
+  clienteId: '0b6f4a8e-3c1d-4e2f-9a7b-5c8d1e2f3a4b',
+  placa: 'ABC123',
+  marca: 'Toyota',
+  modelo: 'Yaris',
 };
 
 describe('CreateVehicleDto', () => {
   it('normaliza la placa y el VIN', async () => {
     const { dto, messages } = await errorsOf({
       ...valid,
-      plate: ' abc-123 ',
+      placa: ' abc-123 ',
       vin: 'jtdbt9237 71234567',
     });
     expect(messages).toEqual([]);
-    expect(dto.plate).toBe('ABC123');
+    expect(dto.placa).toBe('ABC123');
     expect(dto.vin).toBe('JTDBT923771234567');
   });
 
@@ -36,8 +36,8 @@ describe('CreateVehicleDto', () => {
     ['AB12', 'muy corta'],
     ['ABCD1234', 'muy larga'],
     ['AB*123', 'con símbolos'],
-  ])('rechaza la placa %s (%s)', async (plate) => {
-    const { messages } = await errorsOf({ ...valid, plate });
+  ])('rechaza la placa %s (%s)', async (placa) => {
+    const { messages } = await errorsOf({ ...valid, placa });
     expect(messages).toEqual(['La placa tiene de 5 a 7 letras o dígitos']);
   });
 
@@ -50,11 +50,11 @@ describe('CreateVehicleDto', () => {
 
   it('acepta el año siguiente al actual y no más', async () => {
     const next = new Date().getFullYear() + 1;
-    expect((await errorsOf({ ...valid, year: next })).messages).toEqual([]);
-    expect((await errorsOf({ ...valid, year: next + 1 })).messages).toEqual([
+    expect((await errorsOf({ ...valid, anio: next })).messages).toEqual([]);
+    expect((await errorsOf({ ...valid, anio: next + 1 })).messages).toEqual([
       `El año va de 1950 a ${next}`,
     ]);
-    expect((await errorsOf({ ...valid, year: 1949 })).messages).toEqual([
+    expect((await errorsOf({ ...valid, anio: 1949 })).messages).toEqual([
       `El año va de 1950 a ${next}`,
     ]);
   });
@@ -64,16 +64,16 @@ describe('CreateVehicleDto', () => {
       ...valid,
       vin: ' ',
       color: '',
-      notes: '  ',
+      notas: '  ',
     });
     expect(messages).toEqual([]);
     expect(dto.vin).toBeNull();
     expect(dto.color).toBeNull();
-    expect(dto.notes).toBeNull();
+    expect(dto.notas).toBeNull();
   });
 
   it('exige el cliente, la marca y el modelo', async () => {
-    const { messages } = await errorsOf({ plate: 'ABC123', brand: ' ' });
+    const { messages } = await errorsOf({ placa: 'ABC123', marca: ' ' });
     expect(messages).toEqual([
       'Selecciona el cliente',
       'Ingresa la marca',

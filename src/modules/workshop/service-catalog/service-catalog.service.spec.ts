@@ -16,47 +16,51 @@ import {
 
 function item(overrides: Record<string, unknown> = {}) {
   return {
-    serviceCatalogItemId: 's1',
-    name: 'Afinamiento',
-    description: null,
-    laborPrice: new Prisma.Decimal('180'),
-    isActive: true,
+    servicioId: 's1',
+    nombre: 'Afinamiento',
+    descripcion: null,
+    precioManoObra: new Prisma.Decimal('180'),
+    activo: true,
     ...overrides,
   };
 }
 
 describe('serviceCatalogWhere', () => {
   it('sin búsqueda ni filtros no restringe nada', () => {
-    expect(serviceCatalogWhere({})).toEqual({ isActive: undefined });
+    expect(serviceCatalogWhere({})).toEqual({ activo: undefined });
   });
 
   it('busca en el nombre y la descripción, sin distinguir mayúsculas', () => {
-    expect(serviceCatalogWhere({ search: 'aceite', isActive: true })).toEqual({
-      isActive: true,
+    expect(serviceCatalogWhere({ search: 'aceite', activo: true })).toEqual({
+      activo: true,
       OR: [
-        { name: { contains: 'aceite', mode: 'insensitive' } },
-        { description: { contains: 'aceite', mode: 'insensitive' } },
+        { nombre: { contains: 'aceite', mode: 'insensitive' } },
+        { descripcion: { contains: 'aceite', mode: 'insensitive' } },
       ],
     });
   });
 
   it('filtra por un rango de precio, con los extremos incluidos', () => {
-    expect(serviceCatalogWhere({ minPrice: '50', maxPrice: '200' })).toEqual({
-      isActive: undefined,
-      laborPrice: { gte: '50', lte: '200' },
+    expect(
+      serviceCatalogWhere({ precioMinimo: '50', precioMaximo: '200' }),
+    ).toEqual({
+      activo: undefined,
+      precioManoObra: { gte: '50', lte: '200' },
     });
-    expect(serviceCatalogWhere({ minPrice: '100' }).laborPrice).toEqual({
-      gte: '100',
-      lte: undefined,
-    });
+    expect(serviceCatalogWhere({ precioMinimo: '100' }).precioManoObra).toEqual(
+      {
+        gte: '100',
+        lte: undefined,
+      },
+    );
   });
 
   it('acepta un rango de un solo precio y rechaza uno invertido', () => {
     expect(() =>
-      serviceCatalogWhere({ minPrice: '80', maxPrice: '80.00' }),
+      serviceCatalogWhere({ precioMinimo: '80', precioMaximo: '80.00' }),
     ).not.toThrow();
     expect(() =>
-      serviceCatalogWhere({ minPrice: '200', maxPrice: '50.5' }),
+      serviceCatalogWhere({ precioMinimo: '200', precioMaximo: '50.5' }),
     ).toThrow(
       new BadRequestException(
         'El precio mínimo no puede ser mayor que el máximo',
@@ -68,7 +72,7 @@ describe('serviceCatalogWhere', () => {
 describe('ServiceCatalogService', () => {
   const prisma = {
     $transaction: vi.fn((queries: unknown[]) => Promise.all(queries)),
-    serviceCatalogItem: {
+    servicio: {
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
@@ -86,19 +90,19 @@ describe('ServiceCatalogService', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('pagina el listado y desempata el orden por el id', async () => {
-    prisma.serviceCatalogItem.findMany.mockResolvedValue([item()]);
-    prisma.serviceCatalogItem.count.mockResolvedValue(15);
+    prisma.servicio.findMany.mockResolvedValue([item()]);
+    prisma.servicio.count.mockResolvedValue(15);
 
     const page = await service.findAll({
       page: 2,
       pageSize: 10,
-      sortBy: 'laborPrice',
-      sortOrder: 'desc',
+      ordenarPor: 'precioManoObra',
+      sentido: 'desc',
     });
 
-    expect(prisma.serviceCatalogItem.findMany).toHaveBeenCalledWith(
+    expect(prisma.servicio.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: [{ laborPrice: 'desc' }, { serviceCatalogItemId: 'asc' }],
+        orderBy: [{ precioManoObra: 'desc' }, { servicioId: 'asc' }],
         skip: 10,
         take: 10,
       }),
@@ -112,89 +116,89 @@ describe('ServiceCatalogService', () => {
   });
 
   it('no registra un nombre que ya existe con otras mayúsculas', async () => {
-    prisma.serviceCatalogItem.findFirst.mockResolvedValue({
-      serviceCatalogItemId: 's1',
+    prisma.servicio.findFirst.mockResolvedValue({
+      servicioId: 's1',
     });
     await expect(
-      service.create({ name: 'AFINAMIENTO', laborPrice: '150' }),
+      service.create({ nombre: 'AFINAMIENTO', precioManoObra: '150' }),
     ).rejects.toThrow(DUPLICATE);
-    expect(prisma.serviceCatalogItem.findFirst).toHaveBeenCalledWith(
+    expect(prisma.servicio.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { name: { equals: 'AFINAMIENTO', mode: 'insensitive' } },
+        where: { nombre: { equals: 'AFINAMIENTO', mode: 'insensitive' } },
       }),
     );
-    expect(prisma.serviceCatalogItem.create).not.toHaveBeenCalled();
+    expect(prisma.servicio.create).not.toHaveBeenCalled();
   });
 
   it('traduce el nombre repetido de la base (P2002) al mismo 409', async () => {
-    prisma.serviceCatalogItem.findFirst.mockResolvedValue(null);
-    prisma.serviceCatalogItem.create.mockRejectedValue(
+    prisma.servicio.findFirst.mockResolvedValue(null);
+    prisma.servicio.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicado', {
         code: 'P2002',
         clientVersion: 'test',
       }),
     );
     await expect(
-      service.create({ name: 'Afinamiento', laborPrice: '150' }),
+      service.create({ nombre: 'Afinamiento', precioManoObra: '150' }),
     ).rejects.toThrow(DUPLICATE);
   });
 
   it('al renombrar, el propio servicio no choca consigo mismo', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue(item());
-    prisma.serviceCatalogItem.findFirst.mockResolvedValue(null);
-    prisma.serviceCatalogItem.update.mockResolvedValue(item());
+    prisma.servicio.findUnique.mockResolvedValue(item());
+    prisma.servicio.findFirst.mockResolvedValue(null);
+    prisma.servicio.update.mockResolvedValue(item());
 
-    await service.update('s1', { name: 'afinamiento' });
+    await service.update('s1', { nombre: 'afinamiento' });
 
-    expect(prisma.serviceCatalogItem.findFirst).toHaveBeenCalledWith(
+    expect(prisma.servicio.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          name: { equals: 'afinamiento', mode: 'insensitive' },
-          NOT: { serviceCatalogItemId: 's1' },
+          nombre: { equals: 'afinamiento', mode: 'insensitive' },
+          NOT: { servicioId: 's1' },
         },
       }),
     );
   });
 
   it('al editar sin cambiar el nombre no lo vuelve a comparar', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue(item());
-    prisma.serviceCatalogItem.update.mockResolvedValue(item());
-    await service.update('s1', { laborPrice: '200' });
-    expect(prisma.serviceCatalogItem.findFirst).not.toHaveBeenCalled();
+    prisma.servicio.findUnique.mockResolvedValue(item());
+    prisma.servicio.update.mockResolvedValue(item());
+    await service.update('s1', { precioManoObra: '200' });
+    expect(prisma.servicio.findFirst).not.toHaveBeenCalled();
   });
 
   it('responde 404 al editar un servicio que no existe', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue(null);
-    await expect(service.update('s1', { isActive: false })).rejects.toThrow(
+    prisma.servicio.findUnique.mockResolvedValue(null);
+    await expect(service.update('s1', { activo: false })).rejects.toThrow(
       NotFoundException,
     );
-    expect(prisma.serviceCatalogItem.update).not.toHaveBeenCalled();
+    expect(prisma.servicio.update).not.toHaveBeenCalled();
   });
 
   it('no borra un servicio usado en órdenes, y sugiere desactivarlo', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue({
-      _count: { workOrderItems: 3 },
+    prisma.servicio.findUnique.mockResolvedValue({
+      _count: { detallesOrden: 3 },
     });
     await expect(service.remove('s1')).rejects.toThrow(
       new ConflictException(
-        'No se puede eliminar: el servicio ya se usó en 3 ítems de órdenes de trabajo. Puedes desactivarlo para que deje de ofrecerse',
+        'No se puede eliminar: el servicio ya se usó en 3 detalles de órdenes de trabajo. Puedes desactivarlo para que deje de ofrecerse',
       ),
     );
-    expect(prisma.serviceCatalogItem.delete).not.toHaveBeenCalled();
+    expect(prisma.servicio.delete).not.toHaveBeenCalled();
   });
 
   it('borra de verdad un servicio que nunca se usó', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue({
-      _count: { workOrderItems: 0 },
+    prisma.servicio.findUnique.mockResolvedValue({
+      _count: { detallesOrden: 0 },
     });
     await service.remove('s1');
-    expect(prisma.serviceCatalogItem.delete).toHaveBeenCalledWith({
-      where: { serviceCatalogItemId: 's1' },
+    expect(prisma.servicio.delete).toHaveBeenCalledWith({
+      where: { servicioId: 's1' },
     });
   });
 
   it('responde 404 al borrar un servicio que no existe', async () => {
-    prisma.serviceCatalogItem.findUnique.mockResolvedValue(null);
+    prisma.servicio.findUnique.mockResolvedValue(null);
     await expect(service.remove('s1')).rejects.toThrow(NotFoundException);
   });
 });

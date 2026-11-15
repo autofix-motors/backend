@@ -10,7 +10,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { normalizeDocumentNumber } from '../../../../shared/document-number.js';
-import { UserRole } from '../../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../../generated/prisma/enums.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -27,7 +27,7 @@ export class CreateUserDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa el correo' })
-  email: string;
+  correo: string;
 
   @ApiProperty({
     example: '45678912',
@@ -39,14 +39,14 @@ export class CreateUserDto {
   )
   @Matches(/^\d{8}$/, { message: 'El DNI tiene 8 dígitos' })
   @IsString({ message: 'Ingresa el DNI' })
-  documentNumber: string;
+  numeroDocumento: string;
 
   @ApiProperty({ example: 'Juan Quispe Mamani', maxLength: 120 })
   @Transform(trim)
   @MaxLength(120, { message: 'El nombre tiene como máximo 120 caracteres' })
   @IsNotEmpty({ message: 'Ingresa el nombre' })
   @IsString({ message: 'Ingresa el nombre' })
-  name: string;
+  nombre: string;
 
   @ApiPropertyOptional({ type: String, nullable: true, example: '987654321' })
   @IsOptional()
@@ -59,11 +59,11 @@ export class CreateUserDto {
     message: 'El teléfono tiene de 6 a 15 dígitos y puede empezar con +',
   })
   @IsString({ message: 'El teléfono tiene que ser texto' })
-  phone?: string | null;
+  telefono?: string | null;
 
-  @ApiProperty({ enum: UserRole, enumName: 'UserRole' })
-  @IsEnum(UserRole, { message: 'El rol es ADMIN o MECHANIC' })
-  role: UserRole;
+  @ApiProperty({ enum: RolUsuario, enumName: 'RolUsuario' })
+  @IsEnum(RolUsuario, { message: 'El rol es ADMINISTRADOR o MECANICO' })
+  rol: RolUsuario;
 
   // Sin contraseña: la genera el sistema (temporal) y el usuario la cambia al
   // entrar. El administrador no conoce la contraseña de nadie.

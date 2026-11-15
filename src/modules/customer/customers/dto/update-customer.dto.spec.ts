@@ -10,23 +10,23 @@ async function messagesOf(body: Record<string, unknown>) {
 
 describe('UpdateCustomerDto', () => {
   it('acepta un cuerpo con solo algunos campos', async () => {
-    expect(await messagesOf({ phone: '987654321' })).toEqual([]);
+    expect(await messagesOf({ telefono: '987654321' })).toEqual([]);
   });
 
   it('rechaza null en un campo obligatorio, en vez de dejarlo llegar a la base', async () => {
-    expect(await messagesOf({ name: null })).toEqual([
+    expect(await messagesOf({ nombre: null })).toEqual([
       'Ingresa el nombre o la razón social',
     ]);
   });
 
   it('acepta null en un opcional: así se borra el dato', async () => {
-    expect(await messagesOf({ email: null, notes: null })).toEqual([]);
+    expect(await messagesOf({ correo: null, notas: null })).toEqual([]);
   });
 });
 
 describe('UpdateCustomerDto: estado', () => {
-  it('rechaza isActive en null: la columna no admite vacío', async () => {
-    expect(await messagesOf({ isActive: null })).toEqual([
+  it('rechaza activo en null: la columna no admite vacío', async () => {
+    expect(await messagesOf({ activo: null })).toEqual([
       'El estado tiene que ser verdadero o falso',
     ]);
   });

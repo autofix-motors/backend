@@ -55,7 +55,7 @@ describe('ApiExceptionFilter', () => {
   it('no filtra el detalle de un error inesperado', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const body = filter.toBody(
-      new Error('relation "core_user" does not exist'),
+      new Error('relation "usuario" does not exist'),
     );
     expect(body).toMatchObject({
       statusCode: 500,

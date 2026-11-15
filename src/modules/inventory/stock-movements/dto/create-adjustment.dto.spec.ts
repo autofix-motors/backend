@@ -14,52 +14,52 @@ async function errorsOf(body: Record<string, unknown>) {
 }
 
 const valid = {
-  productId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-  quantity: '-2',
-  note: 'Merma: envase roto',
+  productoId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+  cantidad: '-2',
+  nota: 'Merma: envase roto',
 };
 
 describe('CreateAdjustmentDto', () => {
   it('acepta una cantidad con signo, que suma o resta', async () => {
     expect((await errorsOf(valid)).messages).toEqual([]);
-    const { dto, messages } = await errorsOf({ ...valid, quantity: 3.5 });
+    const { dto, messages } = await errorsOf({ ...valid, cantidad: 3.5 });
     expect(messages).toEqual([]);
-    expect(dto.quantity).toBe('3.5');
+    expect(dto.cantidad).toBe('3.5');
   });
 
   it('la cantidad no puede ser 0', async () => {
-    for (const quantity of ['0', '-0', '0.00']) {
-      expect((await errorsOf({ ...valid, quantity })).messages).toEqual([
+    for (const cantidad of ['0', '-0', '0.00']) {
+      expect((await errorsOf({ ...valid, cantidad })).messages).toEqual([
         'La cantidad no puede ser 0: positiva suma al stock y negativa resta',
       ]);
     }
   });
 
   it('valida la forma y el tamaño de la cantidad, también con signo', async () => {
-    expect((await errorsOf({ ...valid, quantity: '-1.255' })).messages).toEqual(
+    expect((await errorsOf({ ...valid, cantidad: '-1.255' })).messages).toEqual(
       ['La cantidad tiene como máximo 2 decimales'],
     );
     expect(
-      (await errorsOf({ ...valid, quantity: '-100000000' })).messages,
+      (await errorsOf({ ...valid, cantidad: '-100000000' })).messages,
     ).toEqual(['La cantidad va de -99999999.99 a 99999999.99']);
-    expect((await errorsOf({ ...valid, quantity: '--2' })).messages).toEqual([
+    expect((await errorsOf({ ...valid, cantidad: '--2' })).messages).toEqual([
       'La cantidad es una cantidad con signo y hasta 2 decimales, por ejemplo -2.50',
     ]);
   });
 
   it('el motivo es obligatorio y se recorta', async () => {
-    for (const note of [undefined, null, '   ']) {
-      expect((await errorsOf({ ...valid, note })).messages).toEqual([
+    for (const nota of [undefined, null, '   ']) {
+      expect((await errorsOf({ ...valid, nota })).messages).toEqual([
         'Ingresa el motivo del ajuste',
       ]);
     }
-    const { dto } = await errorsOf({ ...valid, note: '  Inventario físico ' });
-    expect(dto.note).toBe('Inventario físico');
+    const { dto } = await errorsOf({ ...valid, nota: '  Inventario físico ' });
+    expect(dto.nota).toBe('Inventario físico');
   });
 
   it('limita el motivo a 500 caracteres', async () => {
     expect(
-      (await errorsOf({ ...valid, note: 'x'.repeat(501) })).messages,
+      (await errorsOf({ ...valid, nota: 'x'.repeat(501) })).messages,
     ).toEqual(['El motivo tiene como máximo 500 caracteres']);
   });
 });

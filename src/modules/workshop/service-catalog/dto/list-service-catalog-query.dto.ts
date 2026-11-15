@@ -5,9 +5,9 @@ import { IsMoney } from '../../../../core/validation/money.js';
 import { PaginationQueryDto } from '../../../../shared/dto/pagination-query.dto.js';
 
 export const SERVICE_CATALOG_SORT_FIELDS = [
-  'name',
-  'laborPrice',
-  'createdAt',
+  'nombre',
+  'precioManoObra',
+  'creadoEn',
 ] as const;
 export type ServiceCatalogSortField =
   (typeof SERVICE_CATALOG_SORT_FIELDS)[number];
@@ -28,7 +28,7 @@ export class ListServiceCatalogQueryDto extends PaginationQueryDto {
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean({ message: 'El estado es true o false' })
-  isActive?: boolean;
+  activo?: boolean;
 
   @ApiPropertyOptional({
     type: String,
@@ -38,7 +38,7 @@ export class ListServiceCatalogQueryDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(optionalMoney)
   @IsMoney('El precio mínimo')
-  minPrice?: string;
+  precioMinimo?: string;
 
   @ApiPropertyOptional({
     type: String,
@@ -48,17 +48,17 @@ export class ListServiceCatalogQueryDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(optionalMoney)
   @IsMoney('El precio máximo')
-  maxPrice?: string;
+  precioMaximo?: string;
 
-  @ApiPropertyOptional({ enum: SERVICE_CATALOG_SORT_FIELDS, default: 'name' })
+  @ApiPropertyOptional({ enum: SERVICE_CATALOG_SORT_FIELDS, default: 'nombre' })
   @IsOptional()
   @IsIn(SERVICE_CATALOG_SORT_FIELDS, {
-    message: 'Se ordena por name, laborPrice o createdAt',
+    message: 'Se ordena por nombre, precioManoObra o creadoEn',
   })
-  sortBy: ServiceCatalogSortField = 'name';
+  ordenarPor: ServiceCatalogSortField = 'nombre';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
   @IsOptional()
-  @IsIn(['asc', 'desc'], { message: 'El orden es asc o desc' })
-  sortOrder: 'asc' | 'desc' = 'asc';
+  @IsIn(['asc', 'desc'], { message: 'El sentido es asc o desc' })
+  sentido: 'asc' | 'desc' = 'asc';
 }

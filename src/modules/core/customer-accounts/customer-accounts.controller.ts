@@ -14,7 +14,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../../../core/decorators/roles.decorator.js';
 import { ParseIdPipe } from '../../../core/validation/parse-id.pipe.js';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../generated/prisma/enums.js';
 import { BaseResponseDto } from '../../../shared/dto/base-response.dto.js';
 import { ApiBaseResponse } from '../../../shared/swagger/api-response.decorators.js';
 import { CustomerAccountsService } from './customer-accounts.service.js';
@@ -25,7 +25,7 @@ import { PortalCredentials } from './entities/portal-credentials.entity.js';
  * y quitarlo. Solo el administrador.
  */
 @ApiTags('customer-accounts')
-@Roles(UserRole.ADMIN)
+@Roles(RolUsuario.ADMINISTRADOR)
 @Controller('customer-accounts')
 export class CustomerAccountsController {
   constructor(private readonly accounts: CustomerAccountsService) {}
@@ -38,11 +38,11 @@ export class CustomerAccountsController {
   @ApiBadRequestResponse({ description: 'El cliente está inactivo' })
   @ApiNotFoundResponse({ description: 'No se encontró el cliente' })
   async issueTemporaryPassword(
-    @Param('customerId', ParseIdPipe) customerId: string,
+    @Param('customerId', ParseIdPipe) clienteId: string,
   ): Promise<BaseResponseDto<PortalCredentials>> {
     return BaseResponseDto.success(
       new PortalCredentials(
-        await this.accounts.issueTemporaryPassword(customerId),
+        await this.accounts.issueTemporaryPassword(clienteId),
       ),
       'Contraseña temporal generada: compártela con el cliente',
     );
@@ -53,9 +53,9 @@ export class CustomerAccountsController {
   @ApiBaseResponse(null, { description: 'Acceso al portal quitado' })
   @ApiNotFoundResponse({ description: 'El cliente no tiene acceso al portal' })
   async remove(
-    @Param('customerId', ParseIdPipe) customerId: string,
+    @Param('customerId', ParseIdPipe) clienteId: string,
   ): Promise<BaseResponseDto<null>> {
-    await this.accounts.remove(customerId);
+    await this.accounts.remove(clienteId);
     return BaseResponseDto.success(null, 'Acceso al portal quitado');
   }
 }

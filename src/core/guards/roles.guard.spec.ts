@@ -26,8 +26,9 @@ type Metadata = Partial<
 describe('RolesGuard', () => {
   const reflector = new Reflector();
   const guard = new RolesGuard(reflector);
-  const staff = (role: string) => testContext({ user: { userId: 'u1', role } });
-  const customer = () => testContext({ customer: { customerId: 'c1' } });
+  const staff = (rol: string) =>
+    testContext({ usuario: { usuarioId: 'u1', rol } });
+  const customer = () => testContext({ cliente: { clienteId: 'c1' } });
   const endpoint = (metadata: Metadata) =>
     vi
       .spyOn(reflector, 'getAllAndOverride')
@@ -45,20 +46,20 @@ describe('RolesGuard', () => {
   describe('endpoint sin decorador', () => {
     beforeEach(() => endpoint({}));
     it('el personal pasa (solo exige sesión)', () => {
-      expect(guard.canActivate(staff('MECHANIC'))).toBe(true);
+      expect(guard.canActivate(staff('MECANICO'))).toBe(true);
     });
     it('el cliente recibe 403', () => {
       expect(() => guard.canActivate(customer())).toThrow(FORBIDDEN);
     });
   });
 
-  describe('@Roles(ADMIN)', () => {
-    beforeEach(() => endpoint({ [ROLES_KEY]: ['ADMIN'] }));
+  describe('@Roles(ADMINISTRADOR)', () => {
+    beforeEach(() => endpoint({ [ROLES_KEY]: ['ADMINISTRADOR'] }));
     it('pasa el rol permitido', () => {
-      expect(guard.canActivate(staff('ADMIN'))).toBe(true);
+      expect(guard.canActivate(staff('ADMINISTRADOR'))).toBe(true);
     });
     it('rechaza otro rol del personal', () => {
-      expect(() => guard.canActivate(staff('MECHANIC'))).toThrow(FORBIDDEN);
+      expect(() => guard.canActivate(staff('MECANICO'))).toThrow(FORBIDDEN);
     });
     it('rechaza al cliente', () => {
       expect(() => guard.canActivate(customer())).toThrow(FORBIDDEN);
@@ -71,14 +72,16 @@ describe('RolesGuard', () => {
       expect(guard.canActivate(customer())).toBe(true);
     });
     it('rechaza al personal, aunque sea administrador', () => {
-      expect(() => guard.canActivate(staff('ADMIN'))).toThrow(FORBIDDEN);
+      expect(() => guard.canActivate(staff('ADMINISTRADOR'))).toThrow(
+        FORBIDDEN,
+      );
     });
   });
 
   describe('@AnySession()', () => {
     beforeEach(() => endpoint({ [ANY_SESSION_KEY]: true }));
     it('pasa el personal', () => {
-      expect(guard.canActivate(staff('MECHANIC'))).toBe(true);
+      expect(guard.canActivate(staff('MECANICO'))).toBe(true);
     });
     it('pasa el cliente', () => {
       expect(guard.canActivate(customer())).toBe(true);
@@ -86,7 +89,7 @@ describe('RolesGuard', () => {
   });
 
   it('sin usuario ni cliente en un endpoint protegido, rechaza', () => {
-    endpoint({ [ROLES_KEY]: ['ADMIN'] });
+    endpoint({ [ROLES_KEY]: ['ADMINISTRADOR'] });
     expect(() => guard.canActivate(testContext({}))).toThrow(FORBIDDEN);
   });
 });

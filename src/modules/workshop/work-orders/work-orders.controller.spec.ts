@@ -10,11 +10,11 @@ const rolesOf = (method: keyof WorkOrdersController): unknown =>
 
 describe('WorkOrdersController: roles de los presupuestos', () => {
   it('solo el administrador envía un presupuesto y registra la respuesta', () => {
-    expect(rolesOf('sendQuote')).toEqual(['ADMIN']);
-    expect(rolesOf('decideQuote')).toEqual(['ADMIN']);
+    expect(rolesOf('sendQuote')).toEqual(['ADMINISTRADOR']);
+    expect(rolesOf('decideQuote')).toEqual(['ADMINISTRADOR']);
   });
 
   it('el mecánico (el asignado: lo filtra el service) los ve en el detalle', () => {
-    expect(rolesOf('findOne')).toEqual(['ADMIN', 'MECHANIC']);
+    expect(rolesOf('findOne')).toEqual(['ADMINISTRADOR', 'MECANICO']);
   });
 });

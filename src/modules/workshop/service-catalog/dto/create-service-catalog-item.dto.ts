@@ -21,7 +21,7 @@ export class CreateServiceCatalogItemDto {
   // class-validator evalúa de abajo hacia arriba y se detiene en el primer
   // error: el chequeo más básico va al final.
   @IsString({ message: 'Ingresa el nombre del servicio' })
-  name: string;
+  nombre: string;
 
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
   @IsOptional()
@@ -30,7 +30,7 @@ export class CreateServiceCatalogItemDto {
     message: 'La descripción tiene como máximo 1000 caracteres',
   })
   @IsString({ message: 'La descripción tiene que ser texto' })
-  description?: string | null;
+  descripcion?: string | null;
 
   @ApiProperty({
     oneOf: [
@@ -45,7 +45,7 @@ export class CreateServiceCatalogItemDto {
   @ToMoneyText()
   @IsMoney('El precio de mano de obra')
   @IsNotEmpty({ message: 'Ingresa el precio de mano de obra' })
-  laborPrice: string;
+  precioManoObra: string;
 
   @ApiPropertyOptional({ default: true })
   // Opcional pero no anulable: con @IsOptional un `null` pasaría sin validar y
@@ -54,5 +54,5 @@ export class CreateServiceCatalogItemDto {
     (_dto: CreateServiceCatalogItemDto, value: unknown) => value !== undefined,
   )
   @IsBoolean({ message: 'El estado tiene que ser verdadero o falso' })
-  isActive?: boolean;
+  activo?: boolean;
 }

@@ -8,7 +8,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { TrimToNull } from '../../../../core/validation/trim-to-null.transform.js';
-import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
+import { EstadoOrden } from '../../../../generated/prisma/enums.js';
 
 /**
  * Llevar la orden a otro estado. Qué estados se aceptan desde cuál, y para qué
@@ -16,9 +16,9 @@ import { WorkOrderStatus } from '../../../../generated/prisma/enums.js';
  * service.
  */
 export class ChangeWorkOrderStatusDto {
-  @ApiProperty({ enum: WorkOrderStatus, enumName: 'WorkOrderStatus' })
-  @IsEnum(WorkOrderStatus, { message: 'El estado no es válido' })
-  status: WorkOrderStatus;
+  @ApiProperty({ enum: EstadoOrden, enumName: 'EstadoOrden' })
+  @IsEnum(EstadoOrden, { message: 'El estado no es válido' })
+  estado: EstadoOrden;
 
   @ApiPropertyOptional({
     type: String,
@@ -30,7 +30,7 @@ export class ChangeWorkOrderStatusDto {
   @TrimToNull()
   @MaxLength(2000, { message: 'La nota tiene como máximo 2000 caracteres' })
   @IsString({ message: 'La nota tiene que ser texto' })
-  note?: string | null;
+  nota?: string | null;
 
   @ApiPropertyOptional({
     default: true,
@@ -41,5 +41,5 @@ export class ChangeWorkOrderStatusDto {
     (_dto: ChangeWorkOrderStatusDto, value: unknown) => value !== undefined,
   )
   @IsBoolean({ message: 'Indica si el cliente ve el cambio (true o false)' })
-  isPublic?: boolean;
+  esPublico?: boolean;
 }

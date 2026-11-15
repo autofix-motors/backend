@@ -1,30 +1,30 @@
 import { Prisma } from '../../../generated/prisma/client.js';
-import type { WorkOrderItem } from '../../../generated/prisma/client.js';
-import { ItemType } from '../../../generated/prisma/enums.js';
+import type { DetalleOrden } from '../../../generated/prisma/client.js';
+import { TipoDetalle } from '../../../generated/prisma/enums.js';
 
-// Los montos de una orden salen de sus ítems y no se guardan (el schema lo
+// Los montos de una orden salen de sus detalles y no se guardan (el schema lo
 // explica: serían dos verdades). Se calculan con Decimal, nunca con `number`:
 // 0.1 + 0.2 en coma flotante ya no da 0.3, y un céntimo de diferencia en el
 // total es un reclamo en la caja.
 
-/** Lo que hace falta de un ítem para su subtotal. */
-export type PricedItem = Pick<WorkOrderItem, 'quantity' | 'unitPrice'>;
+/** Lo que hace falta de un detalle para su subtotal. */
+export type PricedItem = Pick<DetalleOrden, 'cantidad' | 'precioUnitario'>;
 
-/** Lo que hace falta de un ítem para los totales de la orden. */
+/** Lo que hace falta de un detalle para los totales de la orden. */
 export type TotaledItem = PricedItem &
-  Pick<WorkOrderItem, 'type'> &
-  Partial<Pick<WorkOrderItem, 'unitCost'>>;
+  Pick<DetalleOrden, 'tipo'> &
+  Partial<Pick<DetalleOrden, 'costoUnitario'>>;
 
 export type WorkOrderAmounts = {
   /** Mano de obra: la suma de los servicios. */
-  labor: Prisma.Decimal;
+  manoObra: Prisma.Decimal;
   /** La suma de los repuestos, a precio de venta. */
-  parts: Prisma.Decimal;
+  repuestos: Prisma.Decimal;
   total: Prisma.Decimal;
   /** Lo que costaron los repuestos (su costo congelado al consumirlos). */
-  partsCost: Prisma.Decimal;
-  /** Lo que se gana con los repuestos: `parts` menos `partsCost`. */
-  partsMargin: Prisma.Decimal;
+  costoRepuestos: Prisma.Decimal;
+  /** Lo que se gana con los repuestos: `repuestos` menos `costoRepuestos`. */
+  margenRepuestos: Prisma.Decimal;
 };
 
 /**
@@ -33,40 +33,40 @@ export type WorkOrderAmounts = {
  * redondeados, así que cuadran con lo que se ve línea por línea.
  */
 export function itemSubtotal(item: PricedItem): Prisma.Decimal {
-  return roundCents(item.quantity.times(item.unitPrice));
+  return roundCents(item.cantidad.times(item.precioUnitario));
 }
 
 /** Lo mismo con el costo: lo que costó el repuesto de esa línea. */
 function itemCost(item: TotaledItem): Prisma.Decimal {
-  return roundCents(item.quantity.times(item.unitCost ?? 0));
+  return roundCents(item.cantidad.times(item.costoUnitario ?? 0));
 }
 
 export function workOrderAmounts(
-  items: readonly TotaledItem[],
+  detalles: readonly TotaledItem[],
 ): WorkOrderAmounts {
   const zero = new Prisma.Decimal(0);
-  let labor = zero;
-  let parts = zero;
-  let partsCost = zero;
-  for (const item of items) {
-    if (item.type === ItemType.SERVICE) {
-      labor = labor.plus(itemSubtotal(item));
+  let manoObra = zero;
+  let repuestos = zero;
+  let costoRepuestos = zero;
+  for (const item of detalles) {
+    if (item.tipo === TipoDetalle.SERVICIO) {
+      manoObra = manoObra.plus(itemSubtotal(item));
     } else {
-      parts = parts.plus(itemSubtotal(item));
-      partsCost = partsCost.plus(itemCost(item));
+      repuestos = repuestos.plus(itemSubtotal(item));
+      costoRepuestos = costoRepuestos.plus(itemCost(item));
     }
   }
   return {
-    labor,
-    parts,
-    total: labor.plus(parts),
-    partsCost,
-    partsMargin: parts.minus(partsCost),
+    manoObra,
+    repuestos,
+    total: manoObra.plus(repuestos),
+    costoRepuestos,
+    margenRepuestos: repuestos.minus(costoRepuestos),
   };
 }
 
 /**
- * Un monto como se escribe en la línea de tiempo: «S/ 35.00». Los ítems y los
+ * Un monto como se escribe en la línea de tiempo: «S/ 35.00». Los detalles y los
  * presupuestos lo usan igual, para que el mismo monto se lea igual.
  */
 export function moneyText(amount: Prisma.Decimal): string {

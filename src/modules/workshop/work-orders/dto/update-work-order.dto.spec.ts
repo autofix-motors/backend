@@ -30,14 +30,18 @@ const VEHICLE_ID = '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70';
 describe('UpdateWorkOrderDto', () => {
   it('acepta un cuerpo con solo algunos campos', async () => {
     expect(
-      (await check(UpdateWorkOrderDto, { mileageIn: 90000 })).messages,
+      (await check(UpdateWorkOrderDto, { kilometrajeIngreso: 90000 })).messages,
     ).toEqual([]);
   });
 
   it('rechaza null en el kilometraje y el motivo, en vez de dejarlo llegar a la base', async () => {
     expect(
-      (await check(UpdateWorkOrderDto, { mileageIn: null, reason: null }))
-        .messages,
+      (
+        await check(UpdateWorkOrderDto, {
+          kilometrajeIngreso: null,
+          motivo: null,
+        })
+      ).messages,
     ).toEqual([
       'El kilometraje es un número entero de km',
       'Ingresa el motivo del ingreso',
@@ -48,8 +52,8 @@ describe('UpdateWorkOrderDto', () => {
     expect(
       (
         await check(UpdateWorkOrderDto, {
-          promisedDate: null,
-          mechanicId: null,
+          fechaPrometida: null,
+          mecanicoId: null,
         })
       ).messages,
     ).toEqual([]);
@@ -57,7 +61,7 @@ describe('UpdateWorkOrderDto', () => {
 
   it('el vehículo no se cambia', async () => {
     expect(
-      (await check(UpdateWorkOrderDto, { vehicleId: VEHICLE_ID })).messages,
-    ).toEqual(['no permitido: vehicleId']);
+      (await check(UpdateWorkOrderDto, { vehiculoId: VEHICLE_ID })).messages,
+    ).toEqual(['no permitido: vehiculoId']);
   });
 });

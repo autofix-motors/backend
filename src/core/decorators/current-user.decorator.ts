@@ -7,7 +7,7 @@ import {
 import type { RequestWithSession, SessionUser } from '../auth/session-user.js';
 
 /**
- * El usuario del personal de la petición: `method(@CurrentUser() user)`. Lo
+ * El usuario del personal de la petición: `method(@CurrentUser() usuario)`. Lo
  * deja el AccessGuard; si falta es que el endpoint se marcó @Public() y aun
  * así pide el usuario, y eso es un error de programación que se corta aquí.
  *
@@ -17,8 +17,8 @@ import type { RequestWithSession, SessionUser } from '../auth/session-user.js';
 export const CurrentUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext): SessionUser => {
     const request = context.switchToHttp().getRequest<RequestWithSession>();
-    if (request.user) return request.user;
-    if (request.customer) {
+    if (request.usuario) return request.usuario;
+    if (request.cliente) {
       throw new ForbiddenException('No tienes permiso para esta acción');
     }
     throw new UnauthorizedException('Inicia sesión para continuar');

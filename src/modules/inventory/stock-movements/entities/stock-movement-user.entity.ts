@@ -1,18 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { User as UserModel } from '../../../../generated/prisma/client.js';
+import type { Usuario as UserModel } from '../../../../generated/prisma/client.js';
 
-export type StockMovementUserModel = Pick<UserModel, 'userId' | 'name'>;
+export type StockMovementUserModel = Pick<UserModel, 'usuarioId' | 'nombre'>;
 
 /** Quién registró un movimiento: solo el nombre, nada de su cuenta. */
 export class StockMovementUser {
   constructor(user: StockMovementUserModel) {
-    this.userId = user.userId;
-    this.name = user.name;
+    this.usuarioId = user.usuarioId;
+    this.nombre = user.nombre;
   }
 
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  usuarioId: string;
 
   @ApiProperty({ example: 'Rosa Quispe Mamani' })
-  name: string;
+  nombre: string;
 }

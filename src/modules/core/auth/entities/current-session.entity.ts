@@ -3,19 +3,25 @@ import {
   CUSTOMER_ROLE,
   type SessionRole,
 } from '../../../../core/auth/session-user.js';
-import { UserRole } from '../../../../generated/prisma/enums.js';
+import { RolUsuario } from '../../../../generated/prisma/enums.js';
 
-/** Los roles de una sesión, para Swagger: los del personal y el cliente. */
-const SESSION_ROLES: SessionRole[] = [...Object.values(UserRole), CUSTOMER_ROLE];
+/**
+ * Los roles de una sesión, para Swagger: los del personal y el cliente. Lo
+ * usa también el perfil, con el mismo `enumName`.
+ */
+export const SESSION_ROLES: SessionRole[] = [
+  ...Object.values(RolUsuario),
+  CUSTOMER_ROLE,
+];
 
 /** Lo que se arma para responder, sea personal o cliente. */
 export interface CurrentSessionModel {
-  role: SessionRole;
-  name: string;
-  email: string | null;
-  mustChangePassword: boolean;
-  userId: string | null;
-  customerId: string | null;
+  rol: SessionRole;
+  nombre: string;
+  correo: string | null;
+  debeCambiarContrasena: boolean;
+  usuarioId: string | null;
+  clienteId: string | null;
 }
 
 /**
@@ -25,28 +31,32 @@ export interface CurrentSessionModel {
  */
 export class CurrentSession {
   constructor(session: CurrentSessionModel) {
-    this.role = session.role;
-    this.name = session.name;
-    this.email = session.email;
-    this.mustChangePassword = session.mustChangePassword;
-    this.userId = session.userId;
-    this.customerId = session.customerId;
+    this.rol = session.rol;
+    this.nombre = session.nombre;
+    this.correo = session.correo;
+    this.debeCambiarContrasena = session.debeCambiarContrasena;
+    this.usuarioId = session.usuarioId;
+    this.clienteId = session.clienteId;
   }
 
-  @ApiProperty({ enum: SESSION_ROLES, enumName: 'SessionRole', example: 'ADMIN' })
-  role: SessionRole;
+  @ApiProperty({
+    enum: SESSION_ROLES,
+    enumName: 'RolSesion',
+    example: 'ADMINISTRADOR',
+  })
+  rol: SessionRole;
 
   @ApiProperty({ example: 'Juan Pérez Rojas' })
-  name: string;
+  nombre: string;
 
   @ApiProperty({ type: String, nullable: true, example: 'juan@correo.pe' })
-  email: string | null;
+  correo: string | null;
 
   @ApiProperty({
     description:
       'Tiene la contraseña temporal: hasta cambiarla solo puede ver su sesión y cambiarla',
   })
-  mustChangePassword: boolean;
+  debeCambiarContrasena: boolean;
 
   @ApiProperty({
     type: String,
@@ -54,7 +64,7 @@ export class CurrentSession {
     nullable: true,
     description: 'Del personal; vacío si es un cliente',
   })
-  userId: string | null;
+  usuarioId: string | null;
 
   @ApiProperty({
     type: String,
@@ -62,5 +72,5 @@ export class CurrentSession {
     nullable: true,
     description: 'Del cliente; vacío si es del personal',
   })
-  customerId: string | null;
+  clienteId: string | null;
 }

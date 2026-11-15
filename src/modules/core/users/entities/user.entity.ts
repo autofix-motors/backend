@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { User as UserModel } from '../../../../generated/prisma/client.js';
-import { UserRole } from '../../../../generated/prisma/enums.js';
+import type { Usuario as UserModel } from '../../../../generated/prisma/client.js';
+import { RolUsuario } from '../../../../generated/prisma/enums.js';
 
 export type UserWithCounts = UserModel & {
-  _count: { assignedWorkOrders: number };
+  _count: { ordenesAsignadas: number };
 };
 
 /**
@@ -13,25 +13,25 @@ export type UserWithCounts = UserModel & {
  */
 export class User {
   constructor(user: UserWithCounts) {
-    this.userId = user.userId;
-    this.email = user.email;
-    this.documentNumber = user.documentNumber;
-    this.name = user.name;
-    this.phone = user.phone;
-    this.role = user.role;
-    this.isActive = user.isActive;
-    this.lastLoginAt = user.lastLoginAt;
-    this.mustChangePassword = user.mustChangePassword;
-    this.assignedWorkOrdersCount = user._count.assignedWorkOrders;
-    this.createdAt = user.createdAt;
-    this.updatedAt = user.updatedAt;
+    this.usuarioId = user.usuarioId;
+    this.correo = user.correo;
+    this.numeroDocumento = user.numeroDocumento;
+    this.nombre = user.nombre;
+    this.telefono = user.telefono;
+    this.rol = user.rol;
+    this.activo = user.activo;
+    this.ultimoIngresoEn = user.ultimoIngresoEn;
+    this.debeCambiarContrasena = user.debeCambiarContrasena;
+    this.cantidadOrdenesAsignadas = user._count.ordenesAsignadas;
+    this.creadoEn = user.creadoEn;
+    this.actualizadoEn = user.actualizadoEn;
   }
 
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  usuarioId: string;
 
   @ApiProperty({ example: 'jquispe@autofix.local' })
-  email: string;
+  correo: string;
 
   @ApiProperty({
     type: String,
@@ -39,19 +39,19 @@ export class User {
     example: '45678912',
     description: 'DNI. Vacío en el personal registrado antes de pedirlo',
   })
-  documentNumber: string | null;
+  numeroDocumento: string | null;
 
   @ApiProperty({ example: 'Juan Quispe Mamani' })
-  name: string;
+  nombre: string;
 
   @ApiProperty({ type: String, nullable: true, example: '987654321' })
-  phone: string | null;
+  telefono: string | null;
 
-  @ApiProperty({ enum: UserRole, enumName: 'UserRole' })
-  role: UserRole;
+  @ApiProperty({ enum: RolUsuario, enumName: 'RolUsuario' })
+  rol: RolUsuario;
 
   @ApiProperty()
-  isActive: boolean;
+  activo: boolean;
 
   @ApiProperty({
     type: String,
@@ -59,23 +59,23 @@ export class User {
     nullable: true,
     description: 'Vacío si nunca inició sesión',
   })
-  lastLoginAt: Date | null;
+  ultimoIngresoEn: Date | null;
 
   @ApiProperty({
     description:
       'Todavía tiene la contraseña temporal: no entró o no la cambió',
   })
-  mustChangePassword: boolean;
+  debeCambiarContrasena: boolean;
 
   @ApiProperty({
     example: 4,
     description: 'Órdenes de trabajo donde es el mecánico asignado',
   })
-  assignedWorkOrdersCount: number;
+  cantidadOrdenesAsignadas: number;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 
   @ApiProperty({ format: 'date-time' })
-  updatedAt: Date;
+  actualizadoEn: Date;
 }

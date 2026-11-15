@@ -12,8 +12,8 @@ import type {
 export const CurrentPrincipal = createParamDecorator(
   (_data: unknown, context: ExecutionContext): SessionPrincipal => {
     const request = context.switchToHttp().getRequest<RequestWithSession>();
-    if (request.user) return { kind: 'staff', ...request.user };
-    if (request.customer) return { kind: 'customer', ...request.customer };
+    if (request.usuario) return { tipo: 'personal', ...request.usuario };
+    if (request.cliente) return { tipo: 'cliente', ...request.cliente };
     throw new UnauthorizedException('Inicia sesión para continuar');
   },
 );

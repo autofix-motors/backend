@@ -45,15 +45,15 @@ export class PortalController {
   @Get('vehicles')
   @ApiPaginatedResponse(PortalVehicle)
   async vehicles(
-    @CurrentCustomer() customer: SessionCustomer,
+    @CurrentCustomer() cliente: SessionCustomer,
     @Query() query: ListPortalVehiclesQueryDto,
   ): Promise<BaseResponseDto<PortalVehicle[]>> {
     const { items, meta } = await this.portal.vehiclesOf(
-      customer.customerId,
+      cliente.clienteId,
       query,
     );
     return BaseResponseDto.success(
-      items.map((vehicle) => new PortalVehicle(vehicle)),
+      items.map((vehiculo) => new PortalVehicle(vehiculo)),
       'Vehículos obtenidos',
       HttpStatus.OK,
       { ...meta },
@@ -64,12 +64,12 @@ export class PortalController {
   @ApiBaseResponse(PortalVehicle)
   @ApiNotFoundResponse({ description: 'No es un vehículo del cliente' })
   async vehicle(
-    @CurrentCustomer() customer: SessionCustomer,
-    @Param('vehicleId', ParseIdPipe) vehicleId: string,
+    @CurrentCustomer() cliente: SessionCustomer,
+    @Param('vehicleId', ParseIdPipe) vehiculoId: string,
   ): Promise<BaseResponseDto<PortalVehicle>> {
     return BaseResponseDto.success(
       new PortalVehicle(
-        await this.portal.vehicle(customer.customerId, vehicleId),
+        await this.portal.vehicle(cliente.clienteId, vehiculoId),
       ),
       'Vehículo obtenido',
     );
@@ -78,11 +78,11 @@ export class PortalController {
   @Get('work-orders')
   @ApiPaginatedResponse(PortalWorkOrder)
   async workOrders(
-    @CurrentCustomer() customer: SessionCustomer,
+    @CurrentCustomer() cliente: SessionCustomer,
     @Query() query: ListPortalWorkOrdersQueryDto,
   ): Promise<BaseResponseDto<PortalWorkOrder[]>> {
     const { items, meta } = await this.portal.workOrdersOf(
-      customer.customerId,
+      cliente.clienteId,
       query,
     );
     return BaseResponseDto.success(
@@ -97,12 +97,12 @@ export class PortalController {
   @ApiBaseResponse(PortalWorkOrderDetail)
   @ApiNotFoundResponse({ description: 'No es una orden del cliente' })
   async workOrder(
-    @CurrentCustomer() customer: SessionCustomer,
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
+    @CurrentCustomer() cliente: SessionCustomer,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
   ): Promise<BaseResponseDto<PortalWorkOrderDetail>> {
     return BaseResponseDto.success(
       new PortalWorkOrderDetail(
-        await this.portal.workOrder(customer.customerId, workOrderId),
+        await this.portal.workOrder(cliente.clienteId, ordenTrabajoId),
       ),
       'Orden obtenida',
     );
@@ -119,20 +119,20 @@ export class PortalController {
       'El presupuesto ya tiene respuesta, la orden ya no espera aprobación o cambió mientras tanto',
   })
   async decide(
-    @CurrentCustomer() customer: SessionCustomer,
-    @Param('workOrderId', ParseIdPipe) workOrderId: string,
-    @Param('quoteId', ParseIdPipe) quoteId: string,
+    @CurrentCustomer() cliente: SessionCustomer,
+    @Param('workOrderId', ParseIdPipe) ordenTrabajoId: string,
+    @Param('quoteId', ParseIdPipe) presupuestoId: string,
     @Body() dto: DecidePortalQuoteDto,
   ): Promise<BaseResponseDto<PortalWorkOrderDetail>> {
     const order = await this.portal.decide(
-      customer.customerId,
-      workOrderId,
-      quoteId,
+      cliente.clienteId,
+      ordenTrabajoId,
+      presupuestoId,
       dto,
     );
     return BaseResponseDto.success(
       new PortalWorkOrderDetail(order),
-      dto.decision === 'APPROVED'
+      dto.decision === 'APROBADO'
         ? 'Presupuesto aprobado: el taller continúa con la reparación'
         : 'Presupuesto rechazado: el taller se comunicará contigo',
     );

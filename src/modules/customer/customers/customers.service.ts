@@ -20,21 +20,25 @@ import type { UpdateCustomerDto } from './dto/update-customer.dto.js';
 import type { CustomerWithCounts } from './entities/customer.entity.js';
 
 const WITH_COUNTS = {
-  _count: { select: { vehicles: true } },
+  _count: { select: { vehiculos: true } },
   // Si tiene acceso al portal: sin el hash, que nunca sale de customer-accounts.
-  account: {
-    select: { createdAt: true, lastLoginAt: true, mustChangePassword: true },
+  cuentaCliente: {
+    select: {
+      creadoEn: true,
+      ultimoIngresoEn: true,
+      debeCambiarContrasena: true,
+    },
   },
-} satisfies Prisma.CustomerInclude;
+} satisfies Prisma.ClienteInclude;
 
 /** Cuántos candidatos se prueban como máximo en un login por correo. */
 const MAX_LOGIN_CANDIDATES = 5;
 
 /** Lo que el login del portal necesita de un cliente con acceso. */
 export interface CustomerLoginCandidate {
-  customerId: string;
-  name: string;
-  isActive: boolean;
+  clienteId: string;
+  nombre: string;
+  activo: boolean;
 }
 
 const NOT_FOUND = 'No se encontró el cliente';
@@ -52,22 +56,22 @@ export class CustomersService {
   ): Promise<Page<CustomerWithCounts>> {
     const where = customersWhere(query);
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.customer.findMany({
+      this.prisma.cliente.findMany({
         where,
         include: WITH_COUNTS,
         // El desempate por id hace que la paginación sea estable: con dos
         // clientes del mismo nombre, el orden no cambia entre páginas.
-        orderBy: [{ [query.sortBy]: query.sortOrder }, { customerId: 'asc' }],
+        orderBy: [{ [query.ordenarPor]: query.sentido }, { clienteId: 'asc' }],
         ...pageWindow(query.page, query.pageSize),
       }),
-      this.prisma.customer.count({ where }),
+      this.prisma.cliente.count({ where }),
     ]);
     return { items, meta: paginationMeta(query.page, query.pageSize, total) };
   }
 
-  async findOne(customerId: string): Promise<CustomerWithCounts> {
-    const customer = await this.prisma.customer.findUnique({
-      where: { customerId },
+  async findOne(clienteId: string): Promise<CustomerWithCounts> {
+    const customer = await this.prisma.cliente.findUnique({
+      where: { clienteId },
       include: WITH_COUNTS,
     });
     if (!customer) throw new NotFoundException(NOT_FOUND);
@@ -76,32 +80,32 @@ export class CustomersService {
 
   async create(data: CreateCustomerDto): Promise<CustomerWithCounts> {
     try {
-      return await this.prisma.customer.create({ data, include: WITH_COUNTS });
+      return await this.prisma.cliente.create({ data, include: WITH_COUNTS });
     } catch (error) {
       throw translateDuplicate(error);
     }
   }
 
   async update(
-    customerId: string,
+    clienteId: string,
     data: UpdateCustomerDto,
   ): Promise<CustomerWithCounts> {
-    const current = await this.findOne(customerId);
+    const current = await this.findOne(clienteId);
 
     // El DTO valida el número contra el tipo solo si el cuerpo trae los dos.
     // Si cambia uno solo, la combinación se valida aquí con el guardado.
-    if (data.documentType || data.documentNumber) {
+    if (data.tipoDocumento || data.numeroDocumento) {
       const message = documentNumberError(
-        data.documentType ?? current.documentType,
-        data.documentNumber ?? current.documentNumber,
+        data.tipoDocumento ?? current.tipoDocumento,
+        data.numeroDocumento ?? current.numeroDocumento,
       );
       if (message) throw new BadRequestException(message);
     }
 
     let customer: CustomerWithCounts;
     try {
-      customer = await this.prisma.customer.update({
-        where: { customerId },
+      customer = await this.prisma.cliente.update({
+        where: { clienteId },
         data,
         include: WITH_COUNTS,
       });
@@ -110,8 +114,8 @@ export class CustomersService {
     }
     // Un cliente inactivo no entra a su portal: se cortan sus sesiones para
     // que tampoco pueda renovar la que tenga abierta.
-    if (current.isActive && data.isActive === false) {
-      await this.sessions.revokeAllForCustomer(customerId);
+    if (current.activo && data.activo === false) {
+      await this.sessions.revokeAllForCustomer(clienteId);
     }
     return customer;
   }
@@ -125,15 +129,15 @@ export class CustomersService {
   findLoginCandidates(
     identifier: LoginIdentifier,
   ): Promise<CustomerLoginCandidate[]> {
-    return this.prisma.customer.findMany({
+    return this.prisma.cliente.findMany({
       where: {
-        account: { isNot: null },
-        ...(identifier.kind === 'email'
-          ? { email: identifier.value }
-          : { documentNumber: identifier.value }),
+        cuentaCliente: { isNot: null },
+        ...(identifier.tipo === 'correo'
+          ? { correo: identifier.valor }
+          : { numeroDocumento: identifier.valor }),
       },
-      select: { customerId: true, name: true, isActive: true },
-      orderBy: { customerId: 'asc' },
+      select: { clienteId: true, nombre: true, activo: true },
+      orderBy: { clienteId: 'asc' },
       take: MAX_LOGIN_CANDIDATES,
     });
   }
@@ -143,36 +147,36 @@ export class CustomersService {
    * permite (RESTRICT); se comprueba antes para decir por qué, en vez del
    * mensaje genérico de la clave foránea.
    */
-  async remove(customerId: string): Promise<void> {
-    const customer = await this.prisma.customer.findUnique({
-      where: { customerId },
-      select: { _count: { select: { vehicles: true, workOrders: true } } },
+  async remove(clienteId: string): Promise<void> {
+    const customer = await this.prisma.cliente.findUnique({
+      where: { clienteId },
+      select: { _count: { select: { vehiculos: true, ordenes: true } } },
     });
     if (!customer) throw new NotFoundException(NOT_FOUND);
 
-    const { vehicles, workOrders } = customer._count;
-    if (vehicles || workOrders) {
+    const { vehiculos, ordenes } = customer._count;
+    if (vehiculos || ordenes) {
       throw new ConflictException(
-        `No se puede eliminar: el cliente tiene ${describeHistory(vehicles, workOrders)}. Puedes desactivarlo`,
+        `No se puede eliminar: el cliente tiene ${describeHistory(vehiculos, ordenes)}. Puedes desactivarlo`,
       );
     }
-    await this.prisma.customer.delete({ where: { customerId } });
+    await this.prisma.cliente.delete({ where: { clienteId } });
   }
 }
 
 export function customersWhere(
-  query: Pick<ListCustomersQueryDto, 'search' | 'documentType' | 'isActive'>,
-): Prisma.CustomerWhereInput {
+  query: Pick<ListCustomersQueryDto, 'search' | 'tipoDocumento' | 'activo'>,
+): Prisma.ClienteWhereInput {
   return {
-    documentType: query.documentType,
-    isActive: query.isActive,
+    tipoDocumento: query.tipoDocumento,
+    activo: query.activo,
     ...(query.search && {
       OR: [
-        { name: { contains: query.search, mode: 'insensitive' } },
+        { nombre: { contains: query.search, mode: 'insensitive' } },
         // El número se guarda normalizado: se busca igual, para que
         // «20-1234» encuentre «201234…».
         {
-          documentNumber: {
+          numeroDocumento: {
             contains: query.search.replace(/[\s.-]/g, ''),
             mode: 'insensitive',
           },
@@ -182,11 +186,11 @@ export function customersWhere(
   };
 }
 
-function describeHistory(vehicles: number, workOrders: number): string {
+function describeHistory(vehiculos: number, ordenes: number): string {
   const parts = [
-    vehicles && `${vehicles} ${vehicles === 1 ? 'vehículo' : 'vehículos'}`,
-    workOrders &&
-      `${workOrders} ${workOrders === 1 ? 'orden de trabajo' : 'órdenes de trabajo'}`,
+    vehiculos && `${vehiculos} ${vehiculos === 1 ? 'vehículo' : 'vehículos'}`,
+    ordenes &&
+      `${ordenes} ${ordenes === 1 ? 'orden de trabajo' : 'órdenes de trabajo'}`,
   ].filter(Boolean);
   return parts.join(' y ');
 }

@@ -3,7 +3,7 @@ import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { TrimToNull } from '../../../../core/validation/trim-to-null.transform.js';
 
 /**
- * Enviar el presupuesto. Los ítems y el total no viajan: se toman de la orden
+ * Enviar el presupuesto. Los detalles y el total no viajan: se toman de la orden
  * en el momento de enviarlo, que es justamente lo que se congela.
  */
 export class CreateQuoteDto {
@@ -20,5 +20,5 @@ export class CreateQuoteDto {
   @TrimToNull()
   @MaxLength(2000, { message: 'La nota tiene como máximo 2000 caracteres' })
   @IsString({ message: 'La nota tiene que ser texto' })
-  note?: string | null;
+  nota?: string | null;
 }

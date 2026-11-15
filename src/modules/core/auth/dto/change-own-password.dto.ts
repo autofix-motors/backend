@@ -11,12 +11,12 @@ export class ChangeOwnPasswordDto {
   @MaxLength(200, { message: 'La contraseña es demasiado larga' })
   @MinLength(1, { message: 'Ingresa tu contraseña actual' })
   @IsString({ message: 'Ingresa tu contraseña actual' })
-  currentPassword: string;
+  contrasenaActual: string;
 
   @ApiProperty({ format: 'password', minLength: 8, maxLength: 200 })
   // El mínimo es el mismo del administrador sembrado (ADMIN_PASSWORD).
   @MaxLength(200, { message: 'La contraseña es demasiado larga' })
   @MinLength(8, { message: 'La contraseña nueva tiene al menos 8 caracteres' })
   @IsString({ message: 'Ingresa la contraseña nueva' })
-  newPassword: string;
+  contrasenaNueva: string;
 }

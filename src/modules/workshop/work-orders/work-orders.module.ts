@@ -12,7 +12,7 @@ import { WorkOrdersService } from './work-orders.service.js';
 
 // Importa los módulos dueños del vehículo, del cliente y del personal para
 // verificarlos con sus services al recibir un vehículo o asignar una orden; y
-// los del catálogo, los repuestos y el kardex para los ítems (el servicio o
+// los del catálogo, los repuestos y el kardex para los detalles (el servicio o
 // repuesto que se agrega y el stock que mueve). Ninguna de sus tablas se lee
 // desde aquí (invariante 3).
 @Module({

@@ -1,53 +1,53 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Vehicle as VehicleModel } from '../../../../generated/prisma/client.js';
+import type { Vehiculo as VehicleModel } from '../../../../generated/prisma/client.js';
 import {
   VehicleCustomer,
   type VehicleCustomerModel,
 } from './vehicle-customer.entity.js';
 
 export type VehicleWithRelations = VehicleModel & {
-  customer: VehicleCustomerModel;
-  _count: { workOrders: number };
+  cliente: VehicleCustomerModel;
+  _count: { ordenes: number };
 };
 
 /** Lo que sale de un vehículo por la API, con su dueño y cuántas órdenes tiene. */
 export class Vehicle {
   constructor(vehicle: VehicleWithRelations) {
-    this.vehicleId = vehicle.vehicleId;
-    this.customerId = vehicle.customerId;
-    this.customer = new VehicleCustomer(vehicle.customer);
-    this.plate = vehicle.plate;
-    this.brand = vehicle.brand;
-    this.model = vehicle.model;
-    this.year = vehicle.year;
+    this.vehiculoId = vehicle.vehiculoId;
+    this.clienteId = vehicle.clienteId;
+    this.cliente = new VehicleCustomer(vehicle.cliente);
+    this.placa = vehicle.placa;
+    this.marca = vehicle.marca;
+    this.modelo = vehicle.modelo;
+    this.anio = vehicle.anio;
     this.color = vehicle.color;
     this.vin = vehicle.vin;
-    this.notes = vehicle.notes;
-    this.workOrdersCount = vehicle._count.workOrders;
-    this.createdAt = vehicle.createdAt;
-    this.updatedAt = vehicle.updatedAt;
+    this.notas = vehicle.notas;
+    this.cantidadOrdenes = vehicle._count.ordenes;
+    this.creadoEn = vehicle.creadoEn;
+    this.actualizadoEn = vehicle.actualizadoEn;
   }
 
   @ApiProperty({ format: 'uuid' })
-  vehicleId: string;
+  vehiculoId: string;
 
   @ApiProperty({ format: 'uuid' })
-  customerId: string;
+  clienteId: string;
 
   @ApiProperty({ type: VehicleCustomer })
-  customer: VehicleCustomer;
+  cliente: VehicleCustomer;
 
   @ApiProperty({ example: 'ABC123' })
-  plate: string;
+  placa: string;
 
   @ApiProperty({ example: 'Toyota' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 'Yaris' })
-  model: string;
+  modelo: string;
 
   @ApiProperty({ type: Number, nullable: true, example: 2019 })
-  year: number | null;
+  anio: number | null;
 
   @ApiProperty({ type: String, nullable: true, example: 'Gris plata' })
   color: string | null;
@@ -56,14 +56,14 @@ export class Vehicle {
   vin: string | null;
 
   @ApiProperty({ type: String, nullable: true })
-  notes: string | null;
+  notas: string | null;
 
   @ApiProperty({ example: 3 })
-  workOrdersCount: number;
+  cantidadOrdenes: number;
 
   @ApiProperty({ format: 'date-time' })
-  createdAt: Date;
+  creadoEn: Date;
 
   @ApiProperty({ format: 'date-time' })
-  updatedAt: Date;
+  actualizadoEn: Date;
 }

@@ -15,17 +15,17 @@ describe('ListStockMovementsQueryDto', () => {
   it('por defecto ordena lo más reciente primero', async () => {
     const { dto, messages } = await errorsOf({});
     expect(messages).toEqual([]);
-    expect(dto).toMatchObject({ sortBy: 'createdAt', sortOrder: 'desc' });
+    expect(dto).toMatchObject({ ordenarPor: 'creadoEn', sentido: 'desc' });
   });
 
   it('acepta el tipo, el producto y un rango de días', async () => {
     expect(
       (
         await errorsOf({
-          type: 'WORK_ORDER',
-          productId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
-          from: '2026-10-01',
-          to: '2026-10-31',
+          tipo: 'ORDEN_TRABAJO',
+          productoId: '6f1c2a5e-8d3b-4c7a-9e1f-2b3c4d5e6f70',
+          desde: '2026-10-01',
+          hasta: '2026-10-31',
         })
       ).messages,
     ).toEqual([]);
@@ -35,27 +35,27 @@ describe('ListStockMovementsQueryDto', () => {
     const message = (label: string) =>
       `${label} es un día con el formato AAAA-MM-DD, por ejemplo 2026-10-04`;
     expect(
-      (await errorsOf({ from: '01/10/2026', to: '2026-02-30' })).messages,
+      (await errorsOf({ desde: '01/10/2026', hasta: '2026-02-30' })).messages,
     ).toEqual([message('La fecha desde'), message('La fecha hasta')]);
-    expect((await errorsOf({ from: '2026-10-01T00:00' })).messages).toEqual([
+    expect((await errorsOf({ desde: '2026-10-01T00:00' })).messages).toEqual([
       message('La fecha desde'),
     ]);
-    expect((await errorsOf({ from: '2028-02-29' })).messages).toEqual([]);
+    expect((await errorsOf({ desde: '2028-02-29' })).messages).toEqual([]);
   });
 
   it('rechaza un tipo, un producto o un orden que no existen', async () => {
     expect(
       (
         await errorsOf({
-          type: 'SALE',
-          productId: '123',
-          sortBy: 'unitCost',
+          tipo: 'VENTA',
+          productoId: '123',
+          ordenarPor: 'costoUnitario',
         })
       ).messages,
     ).toEqual([
-      'El tipo es PURCHASE, WORK_ORDER o ADJUSTMENT',
+      'El tipo es COMPRA, ORDEN_TRABAJO o AJUSTE',
       'El producto no es válido',
-      'Se ordena por createdAt o quantity',
+      'Se ordena por creadoEn o cantidad',
     ]);
   });
 });

@@ -6,34 +6,34 @@ import type { VehicleWithRelations } from '../../../customer/vehicles/entities/v
  * sin VIN, notas del taller ni datos del dueño (es él).
  */
 export class PortalVehicle {
-  constructor(vehicle: VehicleWithRelations) {
-    this.vehicleId = vehicle.vehicleId;
-    this.plate = vehicle.plate;
-    this.brand = vehicle.brand;
-    this.model = vehicle.model;
-    this.year = vehicle.year;
-    this.color = vehicle.color;
-    this.workOrdersCount = vehicle._count.workOrders;
+  constructor(vehiculo: VehicleWithRelations) {
+    this.vehiculoId = vehiculo.vehiculoId;
+    this.placa = vehiculo.placa;
+    this.marca = vehiculo.marca;
+    this.modelo = vehiculo.modelo;
+    this.anio = vehiculo.anio;
+    this.color = vehiculo.color;
+    this.cantidadOrdenes = vehiculo._count.ordenes;
   }
 
   @ApiProperty({ format: 'uuid' })
-  vehicleId: string;
+  vehiculoId: string;
 
   @ApiProperty({ example: 'ABC123' })
-  plate: string;
+  placa: string;
 
   @ApiProperty({ example: 'Toyota' })
-  brand: string;
+  marca: string;
 
   @ApiProperty({ example: 'Yaris' })
-  model: string;
+  modelo: string;
 
   @ApiProperty({ type: Number, nullable: true, example: 2018 })
-  year: number | null;
+  anio: number | null;
 
   @ApiProperty({ type: String, nullable: true, example: 'Gris' })
   color: string | null;
 
   @ApiProperty({ example: 3, description: 'Órdenes registradas en el taller' })
-  workOrdersCount: number;
+  cantidadOrdenes: number;
 }
