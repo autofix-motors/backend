@@ -1,6 +1,6 @@
 import argon2 from 'argon2';
 import type { PrismaClient } from '../../src/generated/prisma/client.js';
-import { UserRole } from '../../src/generated/prisma/enums.js';
+import { RolUsuario } from '../../src/generated/prisma/enums.js';
 
 // Lo que core necesita para arrancar: si el entorno lo pide, el primer
 // administrador. Sin él nadie podría entrar, y para crear usuarios hay que
@@ -20,18 +20,20 @@ export async function seedCore(prisma: PrismaClient) {
 
   // Si el usuario ya existe no se toca: volver a sembrar no puede cambiarle la
   // contraseña a alguien que ya la cambió.
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.usuario.findUnique({
+    where: { correo: email },
+  });
   if (existing) {
     console.log(`El administrador ${email} ya existe: no se modifica.`);
     return;
   }
 
-  await prisma.user.create({
+  await prisma.usuario.create({
     data: {
-      email,
-      name: 'Administrador',
-      role: UserRole.ADMIN,
-      passwordHash: await argon2.hash(password, { type: argon2.argon2id }),
+      correo: email,
+      nombre: 'Administrador',
+      rol: RolUsuario.ADMINISTRADOR,
+      hashContrasena: await argon2.hash(password, { type: argon2.argon2id }),
     },
   });
   console.log(`Administrador ${email} creado.`);
