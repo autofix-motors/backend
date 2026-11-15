@@ -5,8 +5,9 @@ de NestJS, que ya viene decidida por el framework y por su CLI: pelearse con ell
 significa que `nest generate` produzca archivos distintos a los escritos a mano,
 y que el desajuste reaparezca cada vez que alguien use el generador.
 
-**Todo identificador va en inglés** (ver [Idioma](#idioma)). Los comentarios,
-los mensajes al usuario, la documentación y los commits siguen en español.
+**El dominio va en español; la estructura de NestJS, en inglés** (ver
+[Idioma](#idioma)). Los comentarios, los mensajes al usuario, la documentación y
+los commits van en español.
 
 ## Archivos: kebab-case y sufijo de rol
 
@@ -125,7 +126,7 @@ va siempre en singular: `user.entity.ts` → `User`.
 | Valores de enum | UPPER_SNAKE_CASE | `IN_PROGRESS`, `MECHANIC` |
 | Constantes de módulo y tokens de inyección | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE`, `USER_REPOSITORY` |
 | Variables de entorno | UPPER_SNAKE_CASE | `DATABASE_URL`, `JWT_SECRET` |
-| Booleanos | prefijo `is`, `has` o `can` | `isActive`, `hasPendingPayment` |
+| Booleanos | prefijo `is`, `has` o `can` | `isActive`, `hasPendingQuote` |
 
 **Las interfaces no llevan prefijo `I`.** `UserRepository`, no `IUserRepository`:
 el prefijo húngaro sobra en TypeScript y ensucia cada importación.
@@ -139,93 +140,90 @@ entidad completa con el hash de la contraseña dentro.
 
 ## Idioma
 
-**Todo identificador va en inglés**: modelos, campos, enums y sus valores,
-tablas, columnas, carpetas, archivos, clases, funciones, variables, rutas de la
-API, cookies y variables de entorno. El inglés es lo que espera cualquiera que
-se sume, y migrar después cuesta más con cada módulo.
+**Desde 2026-11 el dominio va en español** (decisión de quien dirige el
+proyecto, para que el modelo se explique sin traducir): modelos, campos,
+relaciones, enums y sus valores, tablas, columnas y el **JSON de la API**
+(propiedades de DTO y entidades, filtros y valores de `ordenarPor`). Lo que es
+estructura del framework sigue en inglés: carpetas, archivos, clases, métodos,
+módulos, rutas HTTP, cookies, variables de entorno y la infraestructura
+compartida (`BaseResponseDto`, `page`, `pageSize`, `search`).
 
 | Contexto | Idioma |
 |---|---|
-| Identificadores (código, base, API, entorno) | Inglés |
+| Dominio: modelos, campos, enums, tablas, columnas, JSON de la API | Español, sin tildes ni ñ (`anio`, `contrasena`) |
+| Estructura: carpetas, archivos, clases, métodos, rutas HTTP, entorno | Inglés |
 | Comentarios y `///` de Prisma | Español |
 | Mensajes de error que devuelve la API | Español |
 | Documentación, planes, CHANGELOG y commits | Español |
 | Datos sembrados que ve el usuario (nombres de catálogos) | Español |
 
-### Términos del negocio: su nombre en español, al lado
-
-Hay términos del taller cuya traducción no se reconoce a primera vista. Se
-elige una traducción y **el modelo, campo o valor de enum lleva su nombre en
-español en el `///`**:
+### Cómo se escriben los nombres del dominio
 
 ```prisma
-/// Español: orden de trabajo.
-/// Lo que el taller se compromete a hacer sobre un vehículo…
-model WorkOrder {
-  /// Español: kilometraje al ingreso.
-  mileageIn Int @map("mileage_in")
+/// Orden de trabajo (OT). Un ingreso del vehículo al taller…
+model OrdenTrabajo {
+  /// En km. Se congela aquí porque el vehículo vuelve con otro en cada visita.
+  kilometrajeIngreso Int @map("kilometraje_ingreso")
 }
 
-enum UserRole {
-  /// Español: mecánico.
-  MECHANIC
+enum RolUsuario {
+  ADMINISTRADOR
+  MECANICO
 }
 ```
 
-(`WorkOrder` es un ejemplo de cómo se vería; `UserRole` existe en `core.prisma`.)
+- camelCase en el código y snake_case en la base, **sin tildes ni ñ**:
+  `anio`, `contrasena`, `diagnostico`.
+- Fechas de un hecho terminan en `En` (`creadoEn`, `entregadaEn`); booleanos
+  con `activo` o `es…` (`esPublico`).
+- **La traducción se elige una vez** y se anota en el glosario
+  `docs/planificacion/convenciones/01-glosario.md` antes de usarla.
+- **Los términos sin equivalente se quedan como están**: `DNI`, `RUC`, `VIN`.
 
-- **Se marca lo que no se entiende solo.** `mileageIn` lleva «Español:
-  kilometraje al ingreso»; `createdAt` o `email` no llevan nada.
-- **La traducción se elige una vez** y se anota en un glosario en
-  `docs/planificacion/convenciones/` (se crea con el primer término). Un término
-  nuevo se agrega ahí antes de usarlo, para que no aparezcan dos traducciones de
-  lo mismo.
-- **Los términos sin equivalente se quedan como están**, con su explicación:
-  `ubigeo` (el código INEI del distrito), `SUNAT`, `DNI`, `RUC`.
-
-Los campos comunes de cada modelo son `createdAt` y `updatedAt`
-(`created_at`, `updated_at` en la base).
+Los campos comunes de cada modelo son `creadoEn` y `actualizadoEn`
+(`creado_en`, `actualizado_en` en la base).
 
 ## La clave primaria se llama `<entidad>Id`, nunca `id`
 
 ```prisma
-model WorkOrder {
-  workOrderId String @id @default(uuid()) @map("work_order_id") @db.Uuid
-  vehicleId   String @map("vehicle_id") @db.Uuid   // FK: el mismo nombre que la PK de Vehicle
+model OrdenTrabajo {
+  ordenTrabajoId String @id @default(uuid()) @map("orden_trabajo_id") @db.Uuid
+  vehiculoId     String @map("vehiculo_id") @db.Uuid   // FK: el mismo nombre que la PK de Vehiculo
 }
 ```
 
-- **El id de cada modelo es `<entidad>Id`** en camelCase (`userId`, `sessionId`,
-  `quoteItemId`), con su columna en snake_case (`user_id`). Nunca `id` a secas.
+- **El id de cada modelo es `<entidad>Id`** en camelCase (`usuarioId`, `sesionId`,
+  `detallePresupuestoId`), con su columna en snake_case (`usuario_id`). Nunca `id`
+  a secas.
 - **La clave foránea se llama igual que la primaria a la que apunta**:
-  `vehicle.customerId` ↔ `customer.customerId`. Si un modelo apunta dos veces al
-  mismo, el nombre dice el papel (`mechanicId`, `createdById`, ambos a `User`).
+  `vehiculo.clienteId` ↔ `cliente.clienteId`. Si un modelo apunta dos veces al
+  mismo, el nombre dice el papel (`mecanicoId`, `creadoPorId`, ambos a `Usuario`).
 - **Lo mismo fuera de Prisma**: las entidades de respuesta, los DTO, el usuario de
-  la sesión (`SessionUser.userId`) y los tipos del frontend usan ese nombre.
+  la sesión (`SessionUser.usuarioId`) y los tipos del frontend usan ese nombre.
 
 > Con `id` a secas, en un `join` o en un objeto con varias entidades no se sabe de
-> cuál es cada `id`, y el mismo dato se llama `id` en una tabla y `customerId` en
+> cuál es cada `id`, y el mismo dato se llama `id` en una tabla y `clienteId` en
 > otra. Con `<entidad>Id` el nombre es el mismo en todos lados y se busca de una
 > sola pasada.
 
-## Tablas: prefijo del archivo de schema, en singular
+## Tablas: el nombre de la entidad, en singular y sin prefijo
 
-Cada tabla se llama **`{archivo}_{entidad}`**, en singular y snake_case. El
-archivo de schema también va en singular, y su nombre es el prefijo:
+Cada tabla se llama como su modelo, en singular y snake_case, **sin prefijo de
+dominio**:
 
 | Archivo | Modelo | Tabla |
 |---|---|---|
-| `core.prisma` | `User` | `core_user` |
-| `core.prisma` | `Session` | `core_session` |
-| `workshop.prisma` (ejemplo) | `WorkOrder` | `workshop_work_order` |
+| `core.prisma` | `Usuario` | `usuario` |
+| `core.prisma` | `CuentaCliente` | `cuenta_cliente` |
+| `workshop.prisma` | `OrdenTrabajo` | `orden_trabajo` |
 
-- El prefijo va **siempre**, aunque se repita.
-- El **modelo** de Prisma no lleva prefijo: en el código es
-  `this.prisma.user`.
-- Los enums y las columnas no llevan prefijo.
+- El archivo de schema (`core`, `customer`, `inventory`, `workshop`) solo ordena
+  el código; no aparece en la base.
+- Los enums y las columnas tampoco llevan prefijo.
 
-Todo vive en el schema `public` de Postgres: el prefijo existe para que el
-diagrama ERD agrupe las tablas por dominio.
+> Cambió en 2026-11 (antes `{archivo}_{entidad}`, como `workshop_work_order`):
+> quien dirige el proyecto pidió nombres simples para la exposición. Todo vive
+> en el schema `public` de Postgres.
 
 ## Lo que genera una herramienta se queda como viene
 

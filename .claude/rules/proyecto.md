@@ -5,18 +5,16 @@ regla sin motivo se salta en el primer apuro.
 
 ## Idioma
 
-**Todo identificador va en inglés**: modelos, campos, tablas, columnas,
-enums, carpetas, archivos, clases, funciones, variables, rutas de la API y
-variables de entorno.
+**El dominio va en español**: modelos, campos, relaciones, enums y sus
+valores, tablas, columnas y el JSON de la API (DTO y entidades). **La estructura
+va en inglés**: carpetas, archivos, clases, métodos, módulos, rutas HTTP,
+cookies y variables de entorno. Comentarios, mensajes de error, documentación y
+commits, en español. El detalle y el glosario están en
+[`nomenclatura.md`](nomenclatura.md).
 
-**En español** van los comentarios, los mensajes de error que devuelve la API,
-la documentación y los commits. Los términos del negocio sin una traducción
-evidente llevan su nombre en español en el `///` del modelo (`/// Español:
-partida`). Las reglas y el glosario están en [`nomenclatura.md`](nomenclatura.md).
-
-> El código en inglés es lo estándar y lo que espera cualquiera que se sume.
-> El porqué, que es lo que el equipo necesita leer sin traducir, sigue en
-> español.
+> Cambió en 2026-11 (antes todo identificador iba en inglés): el modelo tiene que
+> poder explicarse en una exposición sin traducir nombres. La estructura de
+> NestJS sigue en inglés porque así la genera su CLI.
 
 ## Git
 

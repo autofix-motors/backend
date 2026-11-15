@@ -49,6 +49,22 @@ Reglas:
 
 ---
 
+## 2026-11-15
+
+### Modelo en español, panel de inicio y Mi perfil — Eduardo Huarcaya · 18:30
+commits [`464aa65`](../../commit/464aa65) · [`76bfa80`](../../commit/76bfa80)
+
+El dominio pasa al español: modelos, campos, enums, tablas (sin prefijo:
+`orden_trabajo`, `cliente`) y el JSON de la API. Se quitan los pagos y las
+herramientas (solo flujo operativo y de seguimiento). Nuevos `GET /dashboard`
+(indicadores, gráficos y listas; el mecánico ve solo lo suyo) y
+`GET /auth/profile` (Mi perfil). Plan en `docs/planificacion/modelo/`.
+
+> **IMPORTANTE** — **Cambio incompatible de la API y de la base.** Las 5
+> migraciones anteriores se reemplazaron por una sola `init`: en Railway hay
+> que **vaciar la base** (o recrear el servicio Postgres) antes de desplegar, y
+> luego correr `pnpm db:seed`. El frontend necesita su PR equivalente.
+
 ## 2026-10-18
 
 ### Portal del cliente — Eduardo Huarcaya · 16:33
